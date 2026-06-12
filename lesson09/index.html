@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DoS/DDoS - サービスを止めた事件たち</title>
+  <style>
+    /* ===== リセット・基本設定 ===== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a26;
+      --green: #00ff88;
+      --red: #ff4444;
+      --orange: #ff9500;
+      --purple: #a855f7;
+      --yellow: #ffd60a;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --border: #2a2a3a;
+      --timeline-line: #2a2a3a;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ===== ヒーローセクション ===== */
+    #hero {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Canvasアニメーション背景 */
+    #hero-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255, 68, 68, 0.15);
+      border: 1px solid var(--red);
+      color: var(--red);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+
+    .hero-title {
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .hero-title .accent-green { color: var(--green); }
+    .hero-title .accent-red   { color: var(--red); }
+
+    .hero-subtitle {
+      font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat .num {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .hero-stat .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    .scroll-hint .arrow {
+      font-size: 1.4rem;
+      color: var(--green);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(8px); }
+    }
+
+    /* ===== タイムラインセクション ===== */
+    #timeline {
+      padding: 80px 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-header h2 {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* タイムラインのレイアウト */
+    .timeline-container {
+      position: relative;
+    }
+
+    /* 中央縦ライン（PC） */
+    .timeline-container::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, transparent, var(--timeline-line) 10%, var(--timeline-line) 90%, transparent);
+      transform: translateX(-50%);
+    }
+
+    .timeline-item {
+      position: relative;
+      width: 50%;
+      padding: 0 50px 60px 0;
+    }
+
+    /* 左右交互配置 */
+    .timeline-item:nth-child(odd) {
+      align-self: flex-start;
+      padding: 0 50px 60px 0;
+      margin-left: 0;
+    }
+
+    .timeline-item:nth-child(even) {
+      align-self: flex-end;
+      padding: 0 0 60px 50px;
+      margin-left: 50%;
+    }
+
+    /* タイムラインドット */
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-color, var(--green));
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 12px var(--accent-color, var(--green));
+      z-index: 1;
+    }
+
+    .timeline-item:nth-child(odd)::before {
+      right: -7px;
+    }
+
+    .timeline-item:nth-child(even)::before {
+      left: -7px;
+    }
+
+    /* 事件カード */
+    .incident-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+    }
+
+    .incident-card:hover {
+      border-color: var(--accent-color, var(--green));
+      box-shadow: 0 0 20px rgba(0,255,136,0.1);
+    }
+
+    .card-header {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      user-select: none;
+    }
+
+    .card-top-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .category-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid currentColor;
+      white-space: nowrap;
+    }
+
+    .year-tag {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .expand-icon {
+      margin-left: auto;
+      font-size: 1rem;
+      color: var(--text-muted);
+      transition: transform 0.3s;
+      flex-shrink: 0;
+    }
+
+    .incident-card.expanded .expand-icon {
+      transform: rotate(180deg);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .card-summary {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* カード展開エリア */
+    .card-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .incident-card.expanded .card-body {
+      max-height: 900px;
+    }
+
+    .card-body-inner {
+      padding: 0 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-details {
+      margin: 16px 0;
+    }
+
+    .card-details ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .card-details ul li {
+      font-size: 0.85rem;
+      color: var(--text);
+      padding: 6px 0;
+      padding-left: 18px;
+      position: relative;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .card-details ul li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--accent-color, var(--green));
+    }
+
+    /* アニメーションキャンバスエリア */
+    .anim-area {
+      background: #0d0d18;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .anim-canvas {
+      display: block;
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    .anim-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .anim-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+    }
+
+    .play-btn {
+      background: transparent;
+      border: 1px solid var(--accent-color, var(--green));
+      color: var(--accent-color, var(--green));
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .play-btn:hover {
+      background: var(--accent-color, var(--green));
+      color: var(--bg);
+    }
+
+    /* タブUI（事件5用） */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      border-color: var(--accent-color, var(--yellow));
+      color: var(--accent-color, var(--yellow));
+      background: rgba(255,214,10,0.08);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* ===== フッター ===== */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    footer .footer-title {
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    /* ===== スマホ対応（768px以下） ===== */
+    @media (max-width: 768px) {
+      /* タイムラインを1列にする */
+      .timeline-container::before {
+        left: 18px;
+        transform: none;
+      }
+
+      .timeline-item,
+      .timeline-item:nth-child(odd),
+      .timeline-item:nth-child(even) {
+        width: 100%;
+        padding: 0 0 40px 50px;
+        margin-left: 0;
+      }
+
+      .timeline-item::before,
+      .timeline-item:nth-child(odd)::before,
+      .timeline-item:nth-child(even)::before {
+        left: 11px;
+        right: auto;
+      }
+
+      .hero-stats {
+        gap: 24px;
+      }
+
+      .hero-stat .num {
+        font-size: 1.5rem;
+      }
+
+      .card-body-inner {
+        padding: 0 14px 14px;
+      }
+    }
+
+    /* ===== モーション低減設定への対応 ===== */
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-hint {
+        animation: none;
+      }
+      .card-body {
+        transition: none;
+      }
+    }
+
+    /* ===== ユーティリティ ===== */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==============================
+     ヒーローセクション
+     ============================== -->
+<section id="hero" aria-label="イントロダクション">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-content">
+    <div class="hero-badge">LESSON 09 — DoS / DDoS</div>
+    <h1 class="hero-title">
+      <span class="accent-red">DoS</span>/<span class="accent-green">DDoS</span><br>
+      サービスを止めた事件たち
+    </h1>
+    <p class="hero-subtitle">悪意ある攻撃から、リアカー1台まで</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="num">5</div>
+        <div class="label">事件</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">21年</div>
+        <div class="label">2002-2022</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">1.5 Tbps</div>
+        <div class="label">最大攻撃規模</div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint" aria-label="下にスクロール">
+    <span>スクロールして事件を見る</span>
+    <span class="arrow">↓</span>
+  </div>
+</section>
+
+<!-- ==============================
+     タイムラインセクション
+     ============================== -->
+<section id="timeline" aria-label="事件タイムライン">
+  <div class="section-header">
+    <h2>事件タイムライン</h2>
+    <p>カードをクリックすると詳細とアニメーションが展開します</p>
+  </div>
+
+  <div class="timeline-container" id="timeline-container">
+    <!-- 事件カードはJavaScriptで生成 -->
+  </div>
+</section>
+
+<!-- ==============================
+     フッター
+     ============================== -->
+<footer>
+  <div class="footer-title">社会情報学実習 グループ発表資料</div>
+  <div>作成日: 2026-06-05</div>
+</footer>
+
+<script>
+/* =====================================================
+   ヒーローキャンバスアニメーション
+   背景に流れるパケット（緑と赤の光点・短い線）
+   ===================================================== */
+(function initHeroCanvas() {
+  const canvas = document.getElementById('hero-canvas');
+  const ctx    = canvas.getContext('2d');
+  let   dpr    = window.devicePixelRatio || 1;
+  let   W, H;
+  let   particles = [];
+  let   rafId  = null;
+
+  /* キャンバスサイズ設定（DPR対応） */
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = canvas.clientWidth;
+    H = canvas.clientHeight;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    initParticles();
+  }
+
+  /* パーティクル初期化 */
+  function initParticles() {
+    particles = [];
+    const count = Math.floor((W * H) / 8000);
+    for (let i = 0; i < count; i++) {
+      particles.push(createParticle(true));
+    }
+  }
+
+  /* パーティクル生成（randomStart=trueで初期ランダム位置） */
+  function createParticle(randomStart) {
+    const isRed = Math.random() < 0.35;
+    const speed = 0.4 + Math.random() * 1.2;
+    const angle = Math.random() * Math.PI * 2;
+    return {
+      x:     randomStart ? Math.random() * W : (Math.random() < 0.5 ? -10 : W + 10),
+      y:     randomStart ? Math.random() * H : Math.random() * H,
+      vx:    Math.cos(angle) * speed,
+      vy:    Math.sin(angle) * speed,
+      len:   6 + Math.random() * 18,
+      alpha: 0.2 + Math.random() * 0.7,
+      color: isRed ? '#ff4444' : '#00ff88',
+      size:  0.8 + Math.random() * 1.4,
+    };
+  }
+
+  /* アニメーションループ */
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    /* 背景グラデーション */
+    const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.6);
+    grad.addColorStop(0,   'rgba(10,10,30,0.3)');
+    grad.addColorStop(1,   'rgba(10,10,15,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      /* 軌跡を描く */
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * p.len, p.y - p.vy * p.len);
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.lineWidth   = p.size;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      /* 先端の光点 */
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      /* 移動 */
+      p.x += p.vx;
+      p.y += p.vy;
+
+      /* 画面外に出たら再生成 */
+      if (p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50) {
+        particles[i] = createParticle(false);
+      }
+    }
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  /* リサイズイベント */
+  window.addEventListener('resize', () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    resize();
+    draw();
+  });
+
+  resize();
+  draw();
+})();
+
+
+/* =====================================================
+   事件データ定義
+   各事件の情報をオブジェクト配列で管理
+   ===================================================== */
+const incidents = [
+  /* ------ 事件1: DNSルートサーバー攻撃 ------ */
+  {
+    id:       'dns',
+    year:     '2002 / 2007',
+    category: 'サイバー攻撃',
+    accent:   '#ff4444',
+    title:    'DNSルートサーバー攻撃',
+    summary:  'インターネットの「電話帳」13台が標的に。犯人不明。',
+    details: [
+      '2002年10月: 全13台に1時間の攻撃、9台が一時機能停止',
+      '2007年2月: 2段階攻撃、計7.5時間。米軍管理サーバー含む3台が特に被害',
+      '成功していれば世界中でURLが「存在しない」状態になっていた',
+      '犯人は現在も不明。動機も謎',
+    ],
+    animLabel: 'DNS ROOT SERVER × 13への攻撃',
+    animFn:    'animDNS',
+  },
+  /* ------ 事件2: エストニアサイバー攻撃 ------ */
+  {
+    id:       'estonia',
+    year:     '2007',
+    category: '国家規模サイバー攻撃',
+    accent:   '#ff9500',
+    title:    'エストニアサイバー攻撃',
+    summary:  'ソ連兵像の撤去に激怒したロシア系ハクティビストが22日間攻撃',
+    details: [
+      'きっかけ: 首都タリンのソ連戦没者慰霊碑の移設（2007年4月）',
+      '標的: 政府・銀行・メディアのWebサイト',
+      '当時の銀行取引の95%がオンライン化、2大銀行が2時間停止',
+      '最初は個人のping攻撃 → 徐々に組織的なボットネットDDoSに発展',
+      '攻撃ピークはロシアの対ドイツ戦勝記念日（5月9日）',
+      'ロシア政府は関与を否定。犯人特定できず',
+      'この事件を受けNATOサイバー防衛センターがタリンに設置された',
+    ],
+    animLabel: 'エストニアへの22日間サイバー攻撃',
+    animFn:    'animEstonia',
+  },
+  /* ------ 事件3: Mirai Botnet ------ */
+  {
+    id:       'mirai',
+    year:     '2016',
+    category: 'IoTボットネット',
+    accent:   '#a855f7',
+    title:    'Mirai Botnet',
+    summary:  'Minecraftのシェア争いから生まれた史上最大のDDoS兵器',
+    details: [
+      '作者: 大学生 Paras Jha(21)、Josiah White(20)、Dalton Norman',
+      '動機: 競合MinecraftサーバーをDDoSで潰し、自社の防御サービスを売るため',
+      '仕組み: デフォルトパスワードのままのIoT機器（カメラ・ルーター等）を乗っ取りボット化',
+      'ピーク: 150,000台以上のIoT機器を掌握、最大1.5Tbpsの攻撃力',
+      '被害: KrebsOnSecurity、Dyn（→Twitter/Netflix/Spotify停止）、OVHなど',
+      'ソースコード公開後、制御不能に。現在も亜種が存在',
+      '3人は有罪を認めFBIに協力し実刑を免れた',
+    ],
+    animLabel: 'IoTデバイス感染とDynへの一斉攻撃',
+    animFn:    'animMirai',
+  },
+  /* ------ 事件4: Google Mapsハック ------ */
+  {
+    id:       'maps',
+    year:     '2020',
+    category: '物理的・創造的DoS',
+    accent:   '#00ff88',
+    title:    'Google Mapsハック（Simon Weckert）',
+    summary:  '荷台車＋スマホ99台でベルリンの交通を変えたアーティスト',
+    details: [
+      '実行者: ベルリンのアーティスト Simon Weckert',
+      '手法: 中古スマホ99台にGoogle Mapsを開かせ、荷台車に積んで徒歩で移動',
+      '結果: Googleマップ上で渋滞表示（赤）→ 実際のドライバーが迂回',
+      'メッセージ: 「データは世界そのものではなく、世界のモデルに過ぎない」',
+      'Googleは「クリエイティブな使い方として感謝する」とコメント',
+      'DoS的解釈: 「存在しない渋滞」でナビのルーティング機能を機能不全に',
+    ],
+    animLabel: 'ベルリン市街のフェイク渋滞生成',
+    animFn:    'animMaps',
+  },
+  /* ------ 事件5: 社会的DoS三連発 ------ */
+  {
+    id:       'social',
+    year:     '2001 / 2011 / 2022',
+    category: '社会的・物理的DoS',
+    accent:   '#ffd60a',
+    title:    '社会的DoS三連発',
+    summary:  '悪意なき「リクエスト集中」が引き起こした機能停止',
+    isTabs:   true,
+    tabs: [
+      {
+        label: '明石花火大会（2001）',
+        details: [
+          '1㎡あたり15人という密度で「群衆雪崩」が発生、11名死亡',
+          '唯一の経路（歩道橋）に人が集中する構造的問題',
+          '警備会社は前年の計画書を使い回していた',
+        ],
+        animMode: 'crowd',
+        animIcon: '🚶',
+        animLabel: '歩道橋への群衆集中',
+      },
+      {
+        label: '東日本大震災 電話輻輳（2011）',
+        details: [
+          '震災直後、全国民が同時に安否確認の電話 → 固定電話80〜90%規制',
+          '携帯はドコモ90%・KDDI95%・ソフトバンク70%の規制',
+          '攻撃者＝全国民の善意',
+        ],
+        animMode: 'phone',
+        animIcon: '📞',
+        animLabel: '電話網への同時アクセス集中',
+      },
+      {
+        label: 'ソウル梨泰院（2022）',
+        details: [
+          'ハロウィン目的で10万人超が集中、159人死亡',
+          'コロナ禍明けで群衆管理ノウハウが途絶えていた',
+          '警察は交通規制ゼロ、打ち合わせはコロナ対策のみ',
+        ],
+        animMode: 'crowd2',
+        animIcon: '🎃',
+        animLabel: '会場への10万人超集中',
+      },
+    ],
+    animFn: 'animSocial',
+  },
+];
+
+
+/* =====================================================
+   タイムラインカード生成（DOMをJSで構築）
+   ===================================================== */
+(function buildTimeline() {
+  const container = document.getElementById('timeline-container');
+
+  incidents.forEach((inc, idx) => {
+    /* タイムラインアイテム */
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    item.style.setProperty('--accent-color', inc.accent);
+
+    /* カード本体 */
+    const card = document.createElement('div');
+    card.className = 'incident-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-expanded', 'false');
+    card.style.setProperty('--accent-color', inc.accent);
+
+    /* カードヘッダー（クリック可能部分） */
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-top-row">
+          <span class="category-badge" style="color:${inc.accent};border-color:${inc.accent};">${inc.category}</span>
+          <span class="year-tag">${inc.year}</span>
+          <span class="expand-icon" aria-hidden="true">▾</span>
+        </div>
+        <div class="card-title">${inc.title}</div>
+        <div class="card-summary">${inc.summary}</div>
+      </div>
+      <div class="card-body" aria-hidden="true">
+        <div class="card-body-inner" id="body-${inc.id}"></div>
+      </div>
+    `;
+
+    /* カードボディの中身を構築 */
+    const bodyInner = card.querySelector(`#body-${inc.id}`);
+
+    if (!inc.isTabs) {
+      /* 通常の詳細リスト */
+      const ul = document.createElement('ul');
+      ul.className = 'card-details';
+      const listDiv = document.createElement('div');
+      listDiv.className = 'card-details';
+      listDiv.innerHTML = '<ul>' + inc.details.map(d => `<li>${d}</li>`).join('') + '</ul>';
+      bodyInner.appendChild(listDiv);
+    } else {
+      /* タブUI（事件5） */
+      const tabsDiv = document.createElement('div');
+      tabsDiv.innerHTML = `
+        <div class="tabs" id="tabs-${inc.id}">
+          ${inc.tabs.map((t, i) => `<button class="tab-btn${i===0?' active':''}" data-tab="${i}" style="--accent-color:${inc.accent}">${t.label}</button>`).join('')}
+        </div>
+        ${inc.tabs.map((t, i) => `
+          <div class="tab-panel${i===0?' active':''}" id="tab-panel-${inc.id}-${i}">
+            <div class="card-details"><ul>${t.details.map(d=>`<li>${d}</li>`).join('')}</ul></div>
+          </div>
+        `).join('')}
+      `;
+      bodyInner.appendChild(tabsDiv);
+
+      /* タブ切り替えイベント */
+      tabsDiv.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tabIdx = parseInt(btn.dataset.tab);
+          tabsDiv.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          tabsDiv.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(`tab-panel-${inc.id}-${tabIdx}`).classList.add('active');
+          /* タブ切り替え時にアニメーション再生 */
+          if (window[`restart_${inc.id}`]) {
+            window[`restart_${inc.id}`](tabIdx);
+          }
+        });
+      });
+    }
+
+    /* アニメーションエリア */
+    const animArea = document.createElement('div');
+    animArea.className = 'anim-area';
+    animArea.style.marginTop = '12px';
+
+    const animCanvas = document.createElement('canvas');
+    animCanvas.className = 'anim-canvas';
+    animCanvas.id = `canvas-${inc.id}`;
+    animCanvas.style.height = '200px';
+
+    const animControls = document.createElement('div');
+    animControls.className = 'anim-controls';
+    animControls.innerHTML = `
+      <span class="anim-label">${inc.animLabel}</span>
+      <button class="play-btn" id="play-${inc.id}" style="--accent-color:${inc.accent};border-color:${inc.accent};color:${inc.accent};">▶ 再生</button>
+    `;
+
+    animArea.appendChild(animCanvas);
+    animArea.appendChild(animControls);
+    bodyInner.appendChild(animArea);
+
+    item.appendChild(card);
+    container.appendChild(item);
+
+    /* アコーディオン展開・折りたたみ */
+    let animationStarted = false;
+    function toggleCard() {
+      const expanded = card.classList.toggle('expanded');
+      card.setAttribute('aria-expanded', expanded);
+      card.querySelector('.card-body').setAttribute('aria-hidden', !expanded);
+
+      if (expanded && !animationStarted) {
+        /* 初回展開時にアニメーション初期化・自動再生 */
+        animationStarted = true;
+        setTimeout(() => {
+          window[`init_${inc.id}`] && window[`init_${inc.id}`]();
+        }, 50);
+      } else if (!expanded) {
+        /* 折りたたみ時にアニメーション停止 */
+        window[`stop_${inc.id}`] && window[`stop_${inc.id}`]();
+      } else if (expanded) {
+        /* 再展開時に再生 */
+        window[`restart_${inc.id}`] && window[`restart_${inc.id}`]();
+      }
+    }
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.tab-btn') || e.target.closest('.play-btn')) return;
+      toggleCard();
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleCard();
+      }
+    });
+
+    /* 再生ボタン */
+    animControls.querySelector(`#play-${inc.id}`).addEventListener('click', (e) => {
+      e.stopPropagation();
+      window[`restart_${inc.id}`] && window[`restart_${inc.id}`]();
+    });
+  });
+})();
+
+
+/* =====================================================
+   ユーティリティ: Canvasサイズ設定（DPR対応）
+   ===================================================== */
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w   = canvas.clientWidth;
+  const h   = canvas.clientHeight;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w, h };
+}
+
+
+/* =====================================================
+   事件1アニメーション: DNSルートサーバー攻撃
+   13台のサーバーに四方からパケットが殺到し、
+   徐々にダウン状態（赤く点滅）になる
+   ===================================================== */
+(function() {
+  const ID = 'dns';
+  let rafId = null;
+  let phase = 0; // 0: 待機, 1: 攻撃, 2: ダウン
+  let t = 0;
+  let servers = [];
+  let packets = [];
+  let gauge   = 0;
+  let canvas, ctx, W, H;
+
+  function init() {
+    canvas = document.getElementById(`canvas-${ID}`);
+    if (!canvas) return;
+    const s = setupCanvas(canvas);
+    ctx = s.ctx; W = s.w; H = s.h;
+    reset();
+    if (rafId) cancelAnimationFrame(rafId);
+    draw();
+  }
+
+  function reset() {
+    t = 0; gauge = 0; phase = 1;
+    packets = [];
+    /* 13台のサーバーを円状に配置 */
+    servers = [];
+    const cx = W / 2, cy = H / 2 - 20;
+    const r  = Math.min(W, H) * 0.28;
+    for (let i = 0; i < 13; i++) {
+      const angle = (i / 13) * Math.PI * 2 - Math.PI / 2;
+      servers.push({
+        x:       cx + Math.cos(angle) * r,
+        y:       cy + Math.sin(angle) * r,
+        health:  1.0, // 1.0=正常, 0=ダウン
+        blink:   0,
+        label:   `R${i+1}`,
+      });
+    }
+  }
+
+  function spawnPacket() {
+    /* 画面四方のランダムな位置からランダムなサーバーへ */
+    const target = servers[Math.floor(Math.random() * 13)];
+    const edge = Math.floor(Math.random() * 4);
+    let sx, sy;
+    if      (edge === 0) { sx = Math.random() * W; sy = -10; }
+    else if (edge === 1) { sx = W + 10;            sy = Math.random() * H; }
+    else if (edge === 2) { sx = Math.random() * W; sy = H + 10; }
+    else                 { sx = -10;               sy = Math.random() * H; }
+    packets.push({
+      x: sx, y: sy,
+      tx: target.x, ty: target.y,
+      targetIdx: servers.indexOf(target),
+      speed: 3 + Math.random() * 2,
+      done: false,
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+
+    /* フェーズ1: 攻撃開始 */
+    if (phase === 1) {
+      /* パケットをランダムに追加 */
+      if (t % 3 === 0 && packets.length < 60) spawnPacket();
+
+      /* パケット移動 */
+      packets.forEach(p => {
+        if (p.done) return;
+        const dx = p.tx - p.x, dy = p.ty - p.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < p.speed) {
+          p.done = true;
+          servers[p.targetIdx].health = Math.max(0, servers[p.targetIdx].health - 0.06);
+        } else {
+          p.x += (dx / dist) * p.speed;
+          p.y += (dy / dist) * p.speed;
+        }
+      });
+      packets = packets.filter(p => !p.done);
+
+      /* ゲージ上昇 */
+      gauge = Math.min(1, gauge + 0.003);
+
+      /* 全サーバーのヘルスが低い場合フェーズ2へ（一定時間後） */
+      if (t > 320) phase = 2;
+    }
+
+    /* パケット描画 */
+    packets.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff4444';
+      ctx.globalAlpha = 0.85;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    /* サーバー描画 */
+    servers.forEach((s, i) => {
+      const w2 = 22, h2 = 16;
+      const down = s.health < 0.3;
+      const blinking = down && (Math.floor(t / 15) % 2 === 0);
+
+      /* サーバー矩形 */
+      ctx.beginPath();
+      ctx.roundRect(s.x - w2/2, s.y - h2/2, w2, h2, 3);
+      if (down) {
+        ctx.fillStyle = blinking ? '#ff2222' : '#550000';
+      } else {
+        const g = Math.floor(s.health * 200);
+        ctx.fillStyle = `rgb(0,${g},${Math.floor(s.health * 80)})`;
+      }
+      ctx.fill();
+      ctx.strokeStyle = down ? '#ff4444' : '#00ff88';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      /* ラベル */
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.min(8, W/50)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(down ? 'DOWN' : s.label, s.x, s.y);
+    });
+
+    /* ゲージ（影響度） */
+    const gx = 10, gy = H - 32, gw = W - 20, gh = 14;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(gx, gy, gw, gh);
+    ctx.fillStyle = `rgb(${Math.floor(gauge*255)}, ${Math.floor((1-gauge)*180)}, 0)`;
+    ctx.fillRect(gx, gy, gw * gauge, gh);
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(gx, gy, gw, gh);
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`インターネット全体への影響: ${Math.floor(gauge*100)}%`, W/2, gy + gh/2);
+
+    /* タイトル */
+    ctx.fillStyle = '#888';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('DNS ROOT SERVER ×13', W/2, 6);
+
+    if (phase < 3) {
+      rafId = requestAnimationFrame(draw);
+    }
+  }
+
+  window[`init_${ID}`]    = () => { init(); };
+  window[`stop_${ID}`]    = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+  window[`restart_${ID}`] = () => { window[`stop_${ID}`](); init(); };
+})();
+
+
+/* =====================================================
+   事件2アニメーション: エストニアサイバー攻撃
+   エストニアの地図に周囲からパケットが押し寄せ、
+   攻撃22日間をバーで表現しアイコンがダウンする
+   ===================================================== */
+(function() {
+  const ID = 'estonia';
+  let rafId = null;
+  let t = 0;
+  let packets = [];
+  let dayProgress = 0; // 0〜22日
+  let icons = [];
+  let canvas, ctx, W, H;
+
+  /* エストニアのシンプルな多角形アウトライン（比率で定義） */
+  const ESTONIA_SHAPE = [
+    [0.42, 0.22],[0.52, 0.20],[0.62, 0.24],[0.68, 0.30],
+    [0.65, 0.38],[0.68, 0.45],[0.62, 0.52],[0.55, 0.56],
+    [0.45, 0.54],[0.38, 0.48],[0.35, 0.40],[0.38, 0.32],
+  ];
+
+  function init() {
+    canvas = document.getElementById(`canvas-${ID}`);
+    if (!canvas) return;
+    const s = setupCanvas(canvas);
+    ctx = s.ctx; W = s.w; H = s.h;
+    t = 0; dayProgress = 0; packets = [];
+    /* アイコン（政府・銀行×2・メディア） */
+    icons = [
+      { label: '政府', x: W*0.52, y: H*0.28, down: false, downAt: 80 },
+      { label: '銀行A', x: W*0.40, y: H*0.50, down: false, downAt: 140 },
+      { label: '銀行B', x: W*0.62, y: H*0.46, down: false, downAt: 160 },
+      { label: 'メディア', x: W*0.52, y: H*0.55, down: false, downAt: 200 },
+    ];
+    if (rafId) cancelAnimationFrame(rafId);
+    draw();
+  }
+
+  function spawnPacket() {
+    /* 右側（ロシア方向）から多めに出現 */
+    const fromRight = Math.random() < 0.6;
+    const sx = fromRight ? W + 10 : (Math.random() < 0.5 ? -10 : W * Math.random());
+    const sy = Math.random() * H;
+    const target = icons[Math.floor(Math.random() * icons.length)];
+    packets.push({
+      x: sx, y: sy,
+      tx: target.x, ty: target.y,
+      speed: 2.5 + Math.random() * 2,
+      alpha: 0.7 + Math.random() * 0.3,
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+    dayProgress = Math.min(22, t / 14);
+
+    /* スパイク（5月9日 = 22日中12日目付近） */
+    const spikeDay = 12;
+    const inSpike  = dayProgress >= spikeDay - 0.5 && dayProgress <= spikeDay + 2;
+    if (t % (inSpike ? 1 : 3) === 0 && packets.length < 80) spawnPacket();
+
+    /* エストニア地図アウトライン */
+    ctx.beginPath();
+    ESTONIA_SHAPE.forEach(([rx, ry], i) => {
+      const px = rx * W, py = ry * H;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(0, 150, 200, 0.12)';
+    ctx.strokeStyle = '#0096c8';
+    ctx.lineWidth   = 2;
+    ctx.fill();
+    ctx.stroke();
+
+    /* 地図ラベル */
+    ctx.fillStyle = '#0096c8';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('エストニア', W * 0.52, H * 0.38);
+
+    /* パケット移動・描画 */
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i];
+      const dx = p.tx - p.x, dy = p.ty - p.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 4) { packets.splice(i, 1); continue; }
+      p.x += (dx / dist) * p.speed;
+      p.y += (dy / dist) * p.speed;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff9500';
+      ctx.globalAlpha = p.alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    /* アイコン描画 */
+    icons.forEach(icon => {
+      if (!icon.down && t > icon.downAt) icon.down = true;
+      const blink = icon.down && (Math.floor(t / 20) % 2 === 0);
+      ctx.beginPath();
+      ctx.arc(icon.x, icon.y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = icon.down ? (blink ? '#ff2200' : '#550000') : 'rgba(255,149,0,0.2)';
+      ctx.strokeStyle = icon.down ? '#ff4444' : '#ff9500';
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = '8px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(icon.down ? 'DOWN' : icon.label, icon.x, icon.y);
+    });
+
+    /* 22日間タイムバー */
+    const bx = 10, by = H - 28, bw = W - 20, bh = 10;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(bx, by, bw, bh);
+    const barW = (dayProgress / 22) * bw;
+    const barColor = inSpike ? '#ff2200' : '#ff9500';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(bx, by, barW, bh);
+    if (inSpike) {
+      ctx.fillStyle = 'rgba(255,34,0,0.3)';
+      ctx.fillRect(bx + (spikeDay/22)*bw - 4, by - 4, 8, bh + 8);
+    }
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+    /* 5/9マーカー */
+    const markerX = bx + (spikeDay / 22) * bw;
+    ctx.fillStyle = '#ff2200';
+    ctx.font = '8px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('5/9', markerX, by - 6);
+    ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'left';
+    ctx.fillText(`攻撃 ${Math.floor(dayProgress)}日目 / 22日間`, bx + 4, by + bh / 2 + 1);
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'right';
+    ctx.fillText('← ロシア方向から攻撃', W - 4, by - 2);
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  window[`init_${ID}`]    = () => { init(); };
+  window[`stop_${ID}`]    = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+  window[`restart_${ID}`] = () => { window[`stop_${ID}`](); init(); };
+})();
+
+
+/* =====================================================
+   事件3アニメーション: Mirai Botnet
+   IoTデバイスが感染→紫に変わり、
+   一斉にDynサーバーへ攻撃する。感染台数カウンター付き
+   ===================================================== */
+(function() {
+  const ID = 'mirai';
+  let rafId = null;
+  let t = 0;
+  let devices = [];
+  let packets = [];
+  let infectedCount = 0;
+  let attackPhase = false;
+  let canvas, ctx, W, H;
+
+  function init() {
+    canvas = document.getElementById(`canvas-${ID}`);
+    if (!canvas) return;
+    const s = setupCanvas(canvas);
+    ctx = s.ctx; W = s.w; H = s.h;
+    t = 0; infectedCount = 0; attackPhase = false; packets = [];
+
+    /* IoTデバイスをランダム配置（中央から離れたエリア） */
+    devices = [];
+    const cx = W/2, cy = H/2;
+    for (let i = 0; i < 60; i++) {
+      let x, y;
+      do {
+        x = 15 + Math.random() * (W - 30);
+        y = 15 + Math.random() * (H - 30);
+      } while (Math.abs(x - cx) < 60 && Math.abs(y - cy) < 40);
+      devices.push({
+        x, y,
+        infected: false,
+        infectedAt: 30 + Math.random() * 250,
+        type: Math.floor(Math.random() * 3), // 0:カメラ, 1:ルーター, 2:電球
+      });
+    }
+
+    if (rafId) cancelAnimationFrame(rafId);
+    draw();
+  }
+
+  /* デバイスアイコン文字 */
+  const DEVICE_ICONS = ['📷', '📡', '💡'];
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+
+    /* 感染処理 */
+    devices.forEach(d => {
+      if (!d.infected && t >= d.infectedAt) {
+        d.infected = true;
+        infectedCount++;
+      }
+    });
+
+    /* 感染台数が50を超えたら攻撃フェーズへ */
+    if (infectedCount >= 50 && !attackPhase) attackPhase = true;
+
+    /* 攻撃フェーズ: 感染デバイスからDynへパケット */
+    if (attackPhase && t % 2 === 0 && packets.length < 80) {
+      const infected = devices.filter(d => d.infected);
+      if (infected.length > 0) {
+        const src = infected[Math.floor(Math.random() * infected.length)];
+        packets.push({
+          x: src.x, y: src.y,
+          tx: W/2, ty: H/2,
+          speed: 3 + Math.random() * 2,
+          alpha: 0.7,
+        });
+      }
+    }
+
+    /* デバイス描画 */
+    devices.forEach(d => {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 8, 0, Math.PI * 2);
+      if (d.infected) {
+        const pulse = 0.5 + 0.5 * Math.sin(t / 10 + d.x);
+        ctx.fillStyle = `rgba(168, ${Math.floor(85 - pulse*40)}, 247, 0.7)`;
+        ctx.strokeStyle = '#a855f7';
+      } else {
+        ctx.fillStyle = 'rgba(0, 200, 100, 0.2)';
+        ctx.strokeStyle = '#00cc66';
+      }
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+      /* デバイスタイプ記号 */
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = d.infected ? '#dda0ff' : '#88ffcc';
+      const icons = ['C', 'R', 'L']; // Camera, Router, Light
+      ctx.fillText(icons[d.type], d.x, d.y);
+    });
+
+    /* パケット移動・描画 */
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i];
+      const dx = p.tx - p.x, dy = p.ty - p.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 4) { packets.splice(i, 1); continue; }
+      p.x += (dx/dist) * p.speed;
+      p.y += (dy/dist) * p.speed;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#a855f7';
+      ctx.globalAlpha = p.alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    /* Dynサーバー（中央） */
+    const dynDown = attackPhase && t > 340;
+    const cx = W/2, cy = H/2;
+    ctx.beginPath();
+    ctx.roundRect(cx - 30, cy - 18, 60, 36, 6);
+    if (dynDown) {
+      ctx.fillStyle = Math.floor(t/15) % 2 === 0 ? '#ff2200' : '#440000';
+    } else if (attackPhase) {
+      ctx.fillStyle = `rgba(${Math.floor(100 + Math.sin(t/5)*80)}, 0, 0, 0.8)`;
+    } else {
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
+    }
+    ctx.fill();
+    ctx.strokeStyle = dynDown ? '#ff4444' : (attackPhase ? '#ff9500' : '#a855f7');
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.min(11, W/40)}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(dynDown ? 'DYN DOWN' : 'Dyn DNS', cx, cy - 5);
+    if (dynDown) {
+      ctx.font = '8px system-ui';
+      ctx.fillStyle = '#ffaaaa';
+      ctx.fillText('Twitter/Netflix/Spotify停止', cx, cy + 7);
+    }
+
+    /* 感染台数カウンター */
+    const displayCount = Math.min(150000, Math.floor(infectedCount / 60 * 150000));
+    ctx.fillStyle = '#a855f7';
+    ctx.font = `bold ${Math.min(14, W/30)}px system-ui`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`感染台数: ${displayCount.toLocaleString()} 台`, 8, 6);
+    ctx.font = '9px system-ui';
+    ctx.fillStyle = '#666';
+    ctx.fillText('(最終的に150,000台超)', 8, 24);
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  window[`init_${ID}`]    = () => { init(); };
+  window[`stop_${ID}`]    = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+  window[`restart_${ID}`] = () => { window[`stop_${ID}`](); init(); };
+})();
+
+
+/* =====================================================
+   事件4アニメーション: Google Mapsハック（Simon Weckert）
+   ベルリン市街グリッドを歩く荷台車が通った道を
+   緑→黄→赤に染め、周囲の車が迂回し始める
+   ===================================================== */
+(function() {
+  const ID = 'maps';
+  let rafId = null;
+  let t = 0;
+  let cart = null;        // 荷台車（歩行ルート）
+  let roads = [];         // グリッド道路情報
+  let cars  = [];         // 周囲の車
+  let messageAlpha = 0;   // 最後のメッセージ
+  let canvas, ctx, W, H;
+
+  /* グリッド定義 */
+  const COLS = 7, ROWS = 5;
+  let cellW, cellH, startX, startY;
+
+  function init() {
+    canvas = document.getElementById(`canvas-${ID}`);
+    if (!canvas) return;
+    const s = setupCanvas(canvas);
+    ctx = s.ctx; W = s.w; H = s.h;
+    t = 0; messageAlpha = 0;
+
+    cellW  = W * 0.7 / COLS;
+    cellH  = H * 0.7 / ROWS;
+    startX = W * 0.15;
+    startY = H * 0.15;
+
+    /* 道路セル（各交差点に「渋滞レベル」を持たせる） */
+    roads = [];
+    for (let r = 0; r <= ROWS; r++) {
+      for (let c = 0; c <= COLS; c++) {
+        roads.push({ r, c, congestion: 0 }); // 0〜1
+      }
+    }
+
+    /* 荷台車の移動ルート（グリッド座標のリスト） */
+    cart = {
+      route: [
+        [2,1],[2,2],[2,3],[2,4],[2,5],
+        [3,5],[4,5],[4,4],[4,3],[4,2],[4,1],
+        [3,1],[3,2],[3,3],[3,4],[3,5],
+        [2,5],[2,4],[2,3],[2,2],[2,1],
+      ],
+      step: 0,
+      x: 0, y: 0,
+      progress: 0,
+    };
+    const [r0, c0] = cart.route[0];
+    cart.x = startX + c0 * cellW;
+    cart.y = startY + r0 * cellH;
+
+    /* 車（グリッド上を走る小さな車） */
+    cars = [];
+    for (let i = 0; i < 6; i++) {
+      cars.push({
+        x: startX + Math.random() * (COLS * cellW),
+        y: startY + (Math.floor(Math.random() * ROWS) + 0.5) * cellH,
+        vx: (Math.random() < 0.5 ? 1 : -1) * (0.4 + Math.random() * 0.4),
+        vy: 0,
+        avoiding: false,
+      });
+    }
+
+    if (rafId) cancelAnimationFrame(rafId);
+    draw();
+  }
+
+  function getRoadColor(congestion) {
+    if (congestion < 0.33) {
+      const r = Math.floor(congestion * 3 * 255);
+      return `rgb(${r}, 255, 0)`;
+    } else if (congestion < 0.66) {
+      const g = Math.floor((1 - (congestion - 0.33) * 3) * 200);
+      return `rgb(255, ${g}, 0)`;
+    } else {
+      return `rgb(220, 0, 0)`;
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+
+    /* 荷台車の移動 */
+    if (cart.step < cart.route.length - 1) {
+      cart.progress += 0.015;
+      if (cart.progress >= 1) {
+        cart.progress = 0;
+        cart.step++;
+        /* 道路を混雑させる */
+        const [r, c] = cart.route[cart.step];
+        const road = roads.find(rd => rd.r === r && rd.c === c);
+        if (road) road.congestion = Math.min(1, road.congestion + 0.25);
+        /* 近隣道路も少し混雑 */
+        roads.forEach(rd => {
+          const dr = Math.abs(rd.r - r), dc = Math.abs(rd.c - c);
+          if (dr + dc <= 1) rd.congestion = Math.min(1, rd.congestion + 0.1);
+        });
+      }
+      const [r1, c1] = cart.route[cart.step];
+      const [r2, c2] = cart.route[cart.step + 1] || cart.route[cart.step];
+      cart.x = startX + (c1 + (c2 - c1) * cart.progress) * cellW;
+      cart.y = startY + (r1 + (r2 - r1) * cart.progress) * cellH;
+    } else {
+      /* 全ルート完走後にメッセージ */
+      messageAlpha = Math.min(1, messageAlpha + 0.01);
+    }
+
+    /* グリッド（道路）描画 */
+    /* 縦道 */
+    for (let c = 0; c <= COLS; c++) {
+      const x = startX + c * cellW;
+      for (let r = 0; r < ROWS; r++) {
+        const road = roads.find(rd => rd.r === r && rd.c === c) || { congestion: 0 };
+        const y1   = startY + r * cellH;
+        ctx.beginPath();
+        ctx.moveTo(x, y1);
+        ctx.lineTo(x, y1 + cellH);
+        ctx.strokeStyle = road.congestion > 0.05 ? getRoadColor(road.congestion) : '#333344';
+        ctx.lineWidth   = road.congestion > 0.5 ? 4 : 2;
+        ctx.stroke();
+      }
+    }
+    /* 横道 */
+    for (let r = 0; r <= ROWS; r++) {
+      const y = startY + r * cellH;
+      for (let c = 0; c < COLS; c++) {
+        const road = roads.find(rd => rd.r === r && rd.c === c) || { congestion: 0 };
+        const x1   = startX + c * cellW;
+        ctx.beginPath();
+        ctx.moveTo(x1, y);
+        ctx.lineTo(x1 + cellW, y);
+        ctx.strokeStyle = road.congestion > 0.05 ? getRoadColor(road.congestion) : '#333344';
+        ctx.lineWidth   = road.congestion > 0.5 ? 4 : 2;
+        ctx.stroke();
+      }
+    }
+
+    /* 交差点ドット */
+    roads.forEach(rd => {
+      const x = startX + rd.c * cellW, y = startY + rd.r * cellH;
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = rd.congestion > 0.1 ? getRoadColor(rd.congestion) : '#444466';
+      ctx.fill();
+    });
+
+    /* 車の移動 */
+    cars.forEach(car => {
+      car.x += car.vx;
+      if (car.x < startX - 10)          car.x = startX + COLS * cellW + 10;
+      if (car.x > startX + COLS * cellW + 10) car.x = startX - 10;
+
+      /* 渋滞エリアを避ける（簡易） */
+      const nearRoad = roads.find(rd => {
+        const rx = startX + rd.c * cellW, ry = startY + rd.r * cellH;
+        return Math.abs(car.x - rx) < cellW && Math.abs(car.y - ry) < 10 && rd.congestion > 0.5;
+      });
+      if (nearRoad && !car.avoiding) {
+        car.avoiding = true;
+        car.vy = (Math.random() < 0.5 ? 1 : -1) * cellH;
+      }
+      if (car.avoiding) {
+        car.y += car.vy * 0.05;
+        if (Math.abs(car.vy) < 0.1) { car.avoiding = false; car.vy = 0; }
+        car.vy *= 0.95;
+      }
+
+      /* 車アイコン（小さな矩形） */
+      ctx.fillStyle = car.avoiding ? '#ff9500' : '#4488ff';
+      ctx.fillRect(car.x - 5, car.y - 3, 10, 6);
+    });
+
+    /* 荷台車（人＋荷台） */
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(cart.x, cart.y - 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cart.x - 10, cart.y - 4, 20, 8);
+    /* 「99台のスマホ」イメージ */
+    ctx.fillStyle = 'rgba(0,255,136,0.3)';
+    for (let i = -4; i <= 4; i++) {
+      ctx.fillRect(cart.x + i*2.5 - 1, cart.y - 1, 2, 4);
+    }
+
+    /* ラベル */
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Simon Weckert', cart.x, cart.y + 6);
+
+    /* 「Google Maps上の渋滞」注記 */
+    ctx.fillStyle = '#ff4444';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Google Maps上: 渋滞（赤）', startX, 6);
+    ctx.fillStyle = '#4488ff';
+    ctx.fillText('実際の車: 迂回中', startX, 20);
+
+    /* メッセージフェードイン */
+    if (messageAlpha > 0) {
+      ctx.globalAlpha = messageAlpha;
+      ctx.fillStyle = '#ffd60a';
+      ctx.font = `bold ${Math.min(13, W/25)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('これは攻撃ですか？', W/2, H - 18);
+      ctx.font = '9px system-ui';
+      ctx.fillStyle = '#888';
+      ctx.fillText('"データは世界のモデルに過ぎない" — Simon Weckert', W/2, H - 5);
+      ctx.globalAlpha = 1;
+    }
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  window[`init_${ID}`]    = () => { init(); };
+  window[`stop_${ID}`]    = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+  window[`restart_${ID}`] = () => { window[`stop_${ID}`](); init(); };
+})();
+
+
+/* =====================================================
+   事件5アニメーション: 社会的DoS三連発
+   キャパシティバーに人/電話が流れ込みオーバーフロー
+   タブに応じてアイコン・サービス名を切り替え
+   ===================================================== */
+(function() {
+  const ID = 'social';
+  let rafId = null;
+  let t = 0;
+  let entities = [];
+  let capacity  = 0;
+  let overloaded = false;
+  let currentTab = 0;
+  let canvas, ctx, W, H;
+
+  /* タブごとの設定 */
+  const TAB_CONFIG = [
+    { label: '歩道橋',   color: '#ffd60a', iconChar: '▲', serviceName: '歩道橋', overloadMsg: '群衆雪崩発生' },
+    { label: '電話網',   color: '#00ccff', iconChar: '☎', serviceName: '電話網', overloadMsg: '80~95%規制実施' },
+    { label: '梨泰院会場', color: '#ff9500', iconChar: '●', serviceName: '会場',   overloadMsg: '収容限界突破' },
+  ];
+
+  function init(tabIdx) {
+    canvas = document.getElementById(`canvas-${ID}`);
+    if (!canvas) return;
+    const s = setupCanvas(canvas);
+    ctx = s.ctx; W = s.w; H = s.h;
+    t = 0; capacity = 0; overloaded = false; entities = [];
+    currentTab = (tabIdx !== undefined) ? tabIdx : 0;
+    if (rafId) cancelAnimationFrame(rafId);
+    draw();
+  }
+
+  function spawnEntity() {
+    /* 画面端からサービス（中央）へ向かうエンティティ */
+    const edge = Math.floor(Math.random() * 3); // 左/上/右から
+    let sx, sy;
+    const cx = W/2, cy = H/2;
+    if      (edge === 0) { sx = -10;             sy = H * 0.2 + Math.random() * H * 0.6; }
+    else if (edge === 1) { sx = Math.random() * W; sy = -10; }
+    else                 { sx = W + 10;           sy = H * 0.2 + Math.random() * H * 0.6; }
+    entities.push({ x: sx, y: sy, tx: cx, ty: cy, speed: 1.2 + Math.random() * 1.2, done: false });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t++;
+    const cfg = TAB_CONFIG[currentTab];
+
+    /* エンティティ生成（過負荷後は増加速度アップ） */
+    const spawnRate = overloaded ? 1 : 3;
+    if (t % spawnRate === 0 && entities.length < 120) spawnEntity();
+
+    /* キャパシティ上昇 */
+    if (!overloaded) {
+      capacity = Math.min(1, capacity + 0.003);
+      if (capacity >= 1) overloaded = true;
+    }
+
+    /* エンティティ移動 */
+    for (let i = entities.length - 1; i >= 0; i--) {
+      const e = entities[i];
+      if (e.done) { entities.splice(i, 1); continue; }
+      const dx = e.tx - e.x, dy = e.ty - e.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 6) {
+        e.done = true;
+      } else {
+        e.x += (dx/dist) * e.speed;
+        e.y += (dy/dist) * e.speed;
+      }
+    }
+
+    /* エンティティ描画 */
+    entities.forEach(e => {
+      ctx.fillStyle = overloaded ? cfg.color : `${cfg.color}aa`;
+      ctx.font = `${Math.min(14, W/30)}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cfg.iconChar, e.x, e.y);
+    });
+
+    /* サービス（中央） */
+    const cx = W/2, cy = H/2;
+    const sw = 80, sh = 40;
+    const blink = overloaded && (Math.floor(t/20) % 2 === 0);
+    ctx.beginPath();
+    ctx.roundRect(cx - sw/2, cy - sh/2, sw, sh, 8);
+    ctx.fillStyle = overloaded ? (blink ? '#ff2200' : '#550000') : `${cfg.color}22`;
+    ctx.fill();
+    ctx.strokeStyle = overloaded ? '#ff4444' : cfg.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.min(11, W/40)}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cfg.serviceName, cx, cy - 6);
+    if (overloaded) {
+      ctx.font = '8px system-ui';
+      ctx.fillStyle = '#ffaaaa';
+      ctx.fillText(cfg.overloadMsg, cx, cy + 8);
+    }
+
+    /* キャパシティバー（上部） */
+    const bx = 10, by = 10, bw = W - 20, bh = 18;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(bx, by, bw, bh);
+    const fillColor = overloaded ? '#ff2200' : `rgb(${Math.floor(capacity*255)}, ${Math.floor((1-capacity)*200)}, 0)`;
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(bx, by, bw * Math.min(1, capacity * 1.1), bh);
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      overloaded ? '⚠ SYSTEM OVERLOAD' : `キャパシティ: ${Math.floor(capacity*100)}%`,
+      W/2, by + bh/2
+    );
+
+    /* 人数カウンター */
+    const entsIn = Math.floor(t * 1.8);
+    ctx.fillStyle = cfg.color;
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`流入: ${entsIn.toLocaleString()}`, bx + 2, H - 2);
+
+    /* タブラベル */
+    ctx.fillStyle = '#666';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(cfg.label, W - bx - 2, H - 2);
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  window[`init_${ID}`]    = (tabIdx) => { init(tabIdx); };
+  window[`stop_${ID}`]    = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } };
+  window[`restart_${ID}`] = (tabIdx) => { window[`stop_${ID}`](); init(tabIdx); };
+})();
+
+
+/* =====================================================
+   スクロール時のカード入場アニメーション（IntersectionObserver）
+   ===================================================== */
+(function initScrollReveal() {
+  const cards = document.querySelectorAll('.incident-card');
+  cards.forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+  });
+
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity  = '1';
+          entry.target.style.transform = 'translateY(0)';
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    cards.forEach(card => obs.observe(card));
+  } else {
+    /* フォールバック: IntersectionObserver未対応ブラウザ */
+    cards.forEach(card => {
+      card.style.opacity  = '1';
+      card.style.transform = 'translateY(0)';
+    });
+  }
+})();
+</script>
+</body>
+</html>
