@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ファームウェア更新シミュレーター | AS-3200HX</title>
+  <title>ファームウェア更新 謎解きシミュレーター | AS-3200HX</title>
 
   <!-- ========================================================
        スタイル定義
        グレー・白基調の「ルーター管理画面」風デザイン
-       セキュリティ警告・エラーは赤系で目立たせる
+       謎解き迷路型: ヒント手帳・進行マップ・HUDを常設
   ======================================================== -->
   <style>
     /* ---- CSS リセット & ベース ---- */
@@ -19,7 +19,6 @@
     }
 
     :root {
-      /* カラーパレット */
       --color-bg:          #f0f2f5;
       --color-surface:     #ffffff;
       --color-border:      #d0d5dd;
@@ -38,10 +37,9 @@
       --color-sidebar-bg:  #1d2433;
       --color-sidebar-txt: #bdc3cc;
       --color-sidebar-act: #4a90d9;
-
-      /* サイズ */
-      --sidebar-width: 220px;
-      --header-h:      52px;
+      --sidebar-width:     220px;
+      --header-h:          52px;
+      --hud-w:             260px; /* 右サイドHUD幅 */
     }
 
     body {
@@ -53,13 +51,13 @@
       line-height: 1.6;
     }
 
-    /* ---- 共通レイアウト ---- */
-
-    /* 共通ヘッダー（管理画面上部バー） */
+    /* ============================================================
+       共通ヘッダー（管理画面上部バー）
+    ============================================================ */
     #app-header {
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 300;
       background: var(--color-sidebar-bg);
       color: #fff;
       height: var(--header-h);
@@ -72,7 +70,7 @@
       font-weight: 700;
       font-size: 15px;
       letter-spacing: 0.03em;
-      color: #ffffff;
+      color: #fff;
     }
     #app-header .model-badge {
       background: #3a5070;
@@ -81,7 +79,18 @@
       font-size: 12px;
       color: var(--color-sidebar-txt);
     }
-
+    /* ミュートボタン（Web Audio API） */
+    #btn-mute {
+      margin-left: auto;
+      background: #3a5070;
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      display: none; /* ゲーム開始後に表示 */
+    }
     /* ハンバーガーボタン（スマホ用） */
     #sidebar-toggle {
       display: none;
@@ -91,12 +100,13 @@
       font-size: 22px;
       cursor: pointer;
       padding: 4px 8px;
-      margin-left: auto;
     }
 
-    /* セキュリティ警告バナー（passwordChanged=false の間ずっと表示） */
+    /* ============================================================
+       セキュリティ警告バナー（passwordChanged=false の間常時表示）
+    ============================================================ */
     #security-banner {
-      display: none;  /* JSで制御 */
+      display: none;
       background: var(--color-danger-bg);
       border-bottom: 2px solid var(--color-danger);
       color: var(--color-danger);
@@ -106,34 +116,31 @@
       text-align: center;
       position: sticky;
       top: var(--header-h);
-      z-index: 90;
+      z-index: 200;
     }
-    #security-banner.visible {
-      display: block;
-    }
+    #security-banner.visible { display: block; }
 
-    /* メイン内容エリア（サイドバー＋コンテンツ） */
+    /* ============================================================
+       アプリ本体レイアウト
+       [左サイドバー][メインコンテンツ][右HUD]
+    ============================================================ */
     #app-body {
       display: flex;
       min-height: calc(100vh - var(--header-h));
     }
 
-    /* ---- サイドバー ---- */
+    /* ---- 左サイドバー（管理画面メニュー: N3以降に表示） ---- */
     #sidebar {
       width: var(--sidebar-width);
       flex-shrink: 0;
       background: var(--color-sidebar-bg);
       color: var(--color-sidebar-txt);
-      display: none;      /* step3以降で表示 */
+      display: none;
       flex-direction: column;
       padding-top: 12px;
     }
-    #sidebar.visible {
-      display: flex;
-    }
-    #sidebar nav ul {
-      list-style: none;
-    }
+    #sidebar.visible { display: flex; }
+    #sidebar nav ul { list-style: none; }
     #sidebar nav ul li a {
       display: block;
       padding: 11px 20px;
@@ -165,7 +172,7 @@
       vertical-align: middle;
     }
 
-    /* ---- コンテンツメインエリア ---- */
+    /* ---- メインコンテンツ ---- */
     #main-content {
       flex: 1;
       min-width: 0;
@@ -173,22 +180,18 @@
       flex-direction: column;
     }
 
-    /* ---- 画面(screen)の表示切り替え ---- */
-    /* 全 screen を非表示にし、.active のものだけ表示する */
+    /* ---- 画面切り替え ---- */
     .screen {
       display: none;
       flex: 1;
       flex-direction: column;
     }
-    .screen.active {
-      display: flex;
-    }
+    .screen.active { display: flex; }
 
-    /* ---- スクリーン内共通 ---- */
     .screen-inner {
       flex: 1;
       padding: 24px 20px;
-      max-width: 800px;
+      max-width: 780px;
       width: 100%;
       margin: 0 auto;
     }
@@ -196,13 +199,14 @@
       font-size: 20px;
       font-weight: 700;
       margin-bottom: 8px;
-      color: var(--color-text);
     }
     .screen-subtitle {
       color: var(--color-text-muted);
       margin-bottom: 20px;
       font-size: 14px;
     }
+
+    /* ---- カード ---- */
     .card {
       background: var(--color-surface);
       border: 1px solid var(--color-border);
@@ -212,7 +216,7 @@
     }
     .card-title {
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--color-text-muted);
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -230,51 +234,21 @@
       cursor: pointer;
       text-decoration: none;
       transition: background 0.15s, opacity 0.15s;
-      min-height: 44px; /* タップしやすいサイズ */
+      min-height: 44px;
     }
-    .btn-primary {
-      background: var(--color-primary);
-      color: #fff;
-    }
-    .btn-primary:hover {
-      background: var(--color-primary-dk);
-    }
-    .btn-secondary {
-      background: #fff;
-      color: var(--color-text);
-      border: 1.5px solid var(--color-border);
-    }
-    .btn-secondary:hover {
-      background: var(--color-bg);
-    }
-    .btn-danger {
-      background: var(--color-danger);
-      color: #fff;
-    }
-    .btn-danger:hover {
-      background: #a93226;
-    }
-    .btn-success {
-      background: var(--color-success);
-      color: #fff;
-    }
-    .btn-success:hover {
-      background: #186a3b;
-    }
-    .btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-    .btn-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .btn-full {
-      width: 100%;
-      text-align: center;
-    }
+    .btn-primary   { background: var(--color-primary); color: #fff; }
+    .btn-primary:hover { background: var(--color-primary-dk); }
+    .btn-secondary { background: #fff; color: var(--color-text); border: 1.5px solid var(--color-border); }
+    .btn-secondary:hover { background: var(--color-bg); }
+    .btn-danger    { background: var(--color-danger); color: #fff; }
+    .btn-danger:hover { background: #a93226; }
+    .btn-success   { background: var(--color-success); color: #fff; }
+    .btn-success:hover { background: #186a3b; }
+    .btn-warning   { background: #e67e22; color: #fff; }
+    .btn-warning:hover { background: #ca6f1e; }
+    .btn:disabled  { opacity: 0.45; cursor: not-allowed; }
+    .btn-group     { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .btn-full      { width: 100%; text-align: center; }
 
     /* ---- 警告・エラーボックス ---- */
     .alert {
@@ -283,26 +257,12 @@
       margin-bottom: 14px;
       font-size: 14px;
     }
-    .alert-danger {
-      background: var(--color-danger-bg);
-      border: 1px solid #e9a9a3;
-      color: var(--color-danger);
-    }
-    .alert-warning {
-      background: var(--color-warning-bg);
-      border: 1px solid #f0c27f;
-      color: var(--color-warning);
-    }
-    .alert-success {
-      background: var(--color-success-bg);
-      border: 1px solid #a3d9a5;
-      color: var(--color-success);
-    }
-    .alert-info {
-      background: #eaf2fb;
-      border: 1px solid #a9cce3;
-      color: #1a5276;
-    }
+    .alert-danger  { background: var(--color-danger-bg);  border: 1px solid #e9a9a3; color: var(--color-danger); }
+    .alert-warning { background: var(--color-warning-bg); border: 1px solid #f0c27f; color: var(--color-warning); }
+    .alert-success { background: var(--color-success-bg); border: 1px solid #a3d9a5; color: var(--color-success); }
+    .alert-info    { background: #eaf2fb; border: 1px solid #a9cce3; color: #1a5276; }
+    .alert-dark    { background: #1a1e28; border: 1px solid #333; color: #8bc34a;
+                     font-family: "Courier New", Courier, monospace; font-size: 13px; }
 
     /* ---- プログレスバー ---- */
     .progress-wrap {
@@ -319,9 +279,8 @@
       width: 0%;
       transition: width 0.4s ease;
     }
-    .progress-bar.error {
-      background: var(--color-danger);
-    }
+    .progress-bar.error   { background: var(--color-danger); }
+    .progress-bar.success { background: var(--color-success); }
     .progress-label {
       font-size: 13px;
       color: var(--color-text-muted);
@@ -329,7 +288,157 @@
       margin-top: 4px;
     }
 
-    /* ---- 操作ログパネル ---- */
+    /* ---- ターミナル風ログ ---- */
+    .terminal-log {
+      background: #1a1e28;
+      color: #8bc34a;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 13px;
+      border-radius: 6px;
+      padding: 14px 16px;
+      min-height: 80px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ============================================================
+       右側 HUD パネル（常設）
+       ヒント手帳・進行マップ・スコア・操作ログ
+    ============================================================ */
+    #hud-panel {
+      width: var(--hud-w);
+      flex-shrink: 0;
+      background: var(--color-surface);
+      border-left: 2px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      max-height: calc(100vh - var(--header-h));
+      position: sticky;
+      top: var(--header-h);
+    }
+    #hud-panel.hidden { display: none; }
+
+    .hud-section {
+      border-bottom: 1px solid var(--color-border);
+      padding: 12px 14px;
+    }
+    .hud-section:last-child { border-bottom: none; }
+    .hud-heading {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* スコアHUD */
+    #hud-score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .hud-score-item {
+      background: var(--color-bg);
+      border-radius: 5px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    .hud-score-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-primary);
+      line-height: 1.2;
+    }
+    .hud-score-lbl {
+      font-size: 10px;
+      color: var(--color-text-muted);
+    }
+
+    /* 進行マップ */
+    #map-nodes {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .map-node {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 4px 6px;
+      border-radius: 5px;
+      background: var(--color-bg);
+      border: 1.5px solid transparent;
+    }
+    .map-node.current {
+      border-color: var(--color-primary);
+      background: #eaf2fb;
+      font-weight: 700;
+    }
+    .map-node.done {
+      background: var(--color-success-bg);
+      color: var(--color-success);
+    }
+    .map-node.trap { background: var(--color-warning-bg); }
+    .map-node.locked { opacity: 0.4; }
+    .map-node-icon { font-size: 14px; flex-shrink: 0; }
+
+    /* ヒント手帳 */
+    #hint-list {
+      list-style: none;
+      font-size: 12px;
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #hint-list li {
+      background: #fffbe6;
+      border: 1px solid #f0e08a;
+      border-radius: 4px;
+      padding: 5px 8px;
+      line-height: 1.4;
+    }
+    #hint-empty {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      font-style: italic;
+    }
+
+    /* 操作ログHUD */
+    #hud-log-lines {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      color: #4fc3f7;
+      max-height: 120px;
+      overflow-y: auto;
+      background: #1a1e28;
+      border-radius: 5px;
+      padding: 8px 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* スマホ用HUDトグルボタン */
+    #hud-toggle {
+      display: none;
+      width: 100%;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    /* ============================================================
+       操作ログパネル（画面下部・常設、HUDが消えるスマホ用にも表示）
+    ============================================================ */
     #log-panel {
       background: #1a1e28;
       color: #8bc34a;
@@ -347,12 +456,8 @@
       margin-bottom: 6px;
       font-weight: bold;
     }
-    #log-lines {
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
+    #log-lines { white-space: pre-wrap; word-break: break-all; }
 
-    /* スマホではログパネルを折りたたみ可 */
     #log-toggle {
       display: none;
       background: #12161f;
@@ -366,7 +471,9 @@
       text-align: left;
     }
 
-    /* ---- フッター ---- */
+    /* ============================================================
+       フッター
+    ============================================================ */
     footer {
       background: var(--color-border);
       color: var(--color-text-muted);
@@ -376,9 +483,9 @@
       border-top: 1px solid #bcc3cc;
     }
 
-    /* ====================================================
-       各スクリーン固有のスタイル
-    ==================================================== */
+    /* ============================================================
+       スクリーン固有スタイル
+    ============================================================ */
 
     /* ---- スタート画面 ---- */
     #screen-start .screen-inner {
@@ -389,18 +496,18 @@
       text-align: center;
       min-height: 60vh;
     }
-    #screen-start .big-title {
+    .big-title {
       font-size: 26px;
       font-weight: 800;
       margin-bottom: 10px;
       color: var(--color-primary);
     }
-    #screen-start .tagline {
+    .tagline {
       font-size: 16px;
       color: var(--color-text-muted);
       margin-bottom: 24px;
     }
-    #screen-start .description {
+    .description {
       font-size: 14px;
       color: var(--color-text-muted);
       max-width: 480px;
@@ -408,7 +515,7 @@
       line-height: 1.8;
     }
 
-    /* ---- ルーターSVGイラスト ---- */
+    /* ---- ルーターSVGラベル ---- */
     #router-svg-wrap {
       display: flex;
       flex-direction: column;
@@ -420,7 +527,6 @@
       max-width: 300px;
       width: 100%;
     }
-    /* ラベル風ボックス（底面ラベル） */
     .router-label-box {
       background: #f8f8f0;
       border: 1.5px solid #b0a888;
@@ -441,34 +547,15 @@
       border-bottom: 1px dotted #cdc9b0;
       padding-bottom: 4px;
     }
-    .router-label-box .label-row:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-    .router-label-box .label-key {
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .router-label-box .label-val {
-      color: #6b6350;
-      text-align: right;
-    }
-    .router-label-box .label-val.muted {
-      color: #aaa9a0;
-      font-size: 12px;
-    }
+    .router-label-box .label-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .router-label-box .label-key { font-weight: 700; white-space: nowrap; }
+    .router-label-box .label-val { color: #6b6350; text-align: right; }
+    /* 初期PWは薄字（意図的な設計: 初学者に「変更すべき」と気づかせる） */
+    .router-label-box .label-val.muted { color: #bbb; font-size: 12px; }
 
     /* ---- ログイン画面 ---- */
-    .form-group {
-      margin-bottom: 16px;
-    }
-    .form-group label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
     .form-group input {
       width: 100%;
       padding: 10px 12px;
@@ -478,22 +565,16 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    .form-group input:focus {
-      border-color: var(--color-primary);
-    }
+    .form-group input:focus { border-color: var(--color-primary); }
 
-    /* ---- 管理トップ (step3) ---- */
+    /* ---- 管理トップ (N3) ---- */
     .fw-version-row {
       display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
     }
-    .fw-version-label {
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--color-primary);
-    }
+    .fw-version-label { font-size: 24px; font-weight: 700; color: var(--color-primary); }
     .fw-update-badge {
       background: var(--color-badge);
       color: #fff;
@@ -503,32 +584,24 @@
       font-weight: 700;
       animation: pulse 1.5s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.7; }
-    }
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .info-item {
-      background: var(--color-bg);
-      border-radius: 6px;
-      padding: 12px 14px;
-    }
-    .info-item .info-label {
-      font-size: 12px;
-      color: var(--color-text-muted);
-      margin-bottom: 4px;
-    }
-    .info-item .info-value {
-      font-size: 15px;
-      font-weight: 600;
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .info-item { background: var(--color-bg); border-radius: 6px; padding: 12px 14px; }
+    .info-item .info-label { font-size: 12px; color: var(--color-text-muted); margin-bottom: 4px; }
+    .info-item .info-value { font-size: 15px; font-weight: 600; }
+
+    /* メンテナンス告知（N3の謎③手がかり: 目立たない位置に配置） */
+    .maint-notice {
+      font-size: 11px;
+      color: #aaa;
+      border: 1px dashed #ccc;
+      border-radius: 4px;
+      padding: 6px 10px;
+      margin-top: 12px;
+      font-family: "Courier New", Courier, monospace;
     }
 
-    /* ---- step4: 更新方法選択 ---- */
+    /* ---- N4: 更新方法選択 ---- */
     .method-cards {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -544,140 +617,233 @@
       text-align: center;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .method-card:hover {
-      border-color: var(--color-primary);
-      box-shadow: 0 2px 8px rgba(26,95,158,0.12);
-    }
-    .method-card .method-icon {
-      font-size: 32px;
-      margin-bottom: 8px;
-      display: block;
-    }
-    .method-card .method-name {
-      font-weight: 700;
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
-    .method-card .method-desc {
-      font-size: 12px;
-      color: var(--color-text-muted);
-    }
+    .method-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(26,95,158,0.12); }
+    .method-card .method-icon { font-size: 32px; margin-bottom: 8px; display: block; }
+    .method-card .method-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .method-card .method-desc { font-size: 12px; color: var(--color-text-muted); }
 
-    /* ローカルファイル指定エリア */
-    #local-file-area {
-      display: none; /* JS で表示 */
-    }
-    #local-file-area.visible {
-      display: block;
-    }
-    .file-selected-box {
+    /* ---- N5: ファイル候補リスト ---- */
+    .file-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       background: var(--color-bg);
-      border: 1.5px solid var(--color-border);
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-family: "Courier New", Courier, monospace;
-      font-size: 14px;
-      color: var(--color-text);
-      margin: 10px 0;
-      min-height: 40px;
-    }
-
-    /* オンラインエラー表示エリア */
-    #online-error-area {
-      display: none;
-    }
-    #online-error-area.visible {
-      display: block;
-    }
-
-    /* ---- step6: 更新プロセス ---- */
-    .terminal-log {
-      background: #1a1e28;
-      color: #8bc34a;
+      border: 2px solid var(--color-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      cursor: pointer;
       font-family: "Courier New", Courier, monospace;
       font-size: 13px;
-      border-radius: 6px;
-      padding: 14px 16px;
-      min-height: 80px;
-      margin-top: 10px;
-      white-space: pre-wrap;
-      word-break: break-all;
+      transition: border-color 0.15s, background 0.15s;
     }
-    /* 更新中の選択ボタンエリア */
-    #update-choice-area {
-      display: none;
+    .file-item:hover { border-color: var(--color-primary); background: #eaf2fb; }
+    .file-item .file-icon { font-size: 20px; flex-shrink: 0; }
+
+    /* ---- N6: 接続方法選択 ---- */
+    .conn-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 16px 0;
     }
-    #update-choice-area.visible {
-      display: block;
+    .conn-card {
+      background: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    /* 再起動後の選択ボタンエリア */
-    #reboot-choice-area {
-      display: none;
-    }
-    #reboot-choice-area.visible {
-      display: block;
+    .conn-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(26,95,158,0.12); }
+    .conn-card .conn-icon { font-size: 36px; margin-bottom: 8px; display: block; }
+    .conn-card .conn-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .conn-card .conn-desc { font-size: 12px; color: var(--color-text-muted); }
+
+    /* ---- N8: 更新プロセス ---- */
+    /* 更新中断ボタン（誘惑ボタン: 学習者が誤操作しやすいよう意図的に配置） */
+    #btn-abort-update {
+      margin-top: 14px;
     }
 
-    /* ---- エンディング画面共通 ---- */
-    .ending-icon {
-      font-size: 56px;
-      display: block;
-      text-align: center;
-      margin-bottom: 12px;
-    }
-    .ending-title {
-      font-size: 22px;
-      font-weight: 800;
-      text-align: center;
-      margin-bottom: 8px;
-    }
-    .ending-message {
-      font-size: 15px;
-      line-height: 1.8;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-    /* 文鎮化エンディングの暗転演出 */
-    #screen-ending-bricked.active {
-      background: #2c2c2c;
-      color: #bbb;
-    }
-    #screen-ending-bricked .card {
-      background: #3a3a3a;
-      border-color: #555;
-    }
-    #screen-ending-bricked .ending-title {
-      color: #e0e0e0;
-    }
-    #screen-ending-bricked .ending-message {
-      color: #aaa;
-    }
-    /* エンディングのログ振り返りパネル */
+    /* ---- エンディング ---- */
+    .ending-icon { font-size: 56px; display: block; text-align: center; margin-bottom: 12px; }
+    .ending-title { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 8px; }
+    .ending-message { font-size: 15px; line-height: 1.8; margin-bottom: 16px; text-align: center; }
+    .ending-hint { font-size: 13px; color: var(--color-text-muted); text-align: center; margin-bottom: 16px; }
     .ending-log-review {
       background: #1a1e28;
       color: #8bc34a;
       font-family: "Courier New", Courier, monospace;
-      font-size: 13px;
+      font-size: 12px;
       border-radius: 6px;
-      padding: 14px 16px;
-      max-height: 200px;
+      padding: 12px 16px;
+      max-height: 180px;
       overflow-y: auto;
       margin-bottom: 14px;
       white-space: pre-wrap;
       word-break: break-all;
     }
-    .ending-hint {
-      font-size: 13px;
-      color: var(--color-text-muted);
+    /* スコア表示 */
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .score-item {
+      background: var(--color-bg);
+      border-radius: 6px;
+      padding: 10px;
       text-align: center;
-      margin-bottom: 16px;
+    }
+    .score-val { font-size: 22px; font-weight: 700; color: var(--color-primary); }
+    .score-lbl { font-size: 11px; color: var(--color-text-muted); }
+    .star-rating { font-size: 28px; text-align: center; margin: 8px 0; }
+    .rating-comment { font-size: 15px; font-weight: 700; text-align: center; color: var(--color-primary); }
+
+    /* ============================================================
+       ふりかえりジャーナル: 手順の解説セクション
+    ============================================================ */
+    .journal-recap {
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    .journal-recap-heading {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--color-text);
+    }
+    .journal-step {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid var(--color-primary);
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .journal-step-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: 6px;
+    }
+    .journal-step-detail {
+      font-size: 14px;
+      color: var(--color-text);
+      line-height: 1.75;
+    }
+    /* スマホでも縦に崩れず読めるようにする */
+    @media (max-width: 480px) {
+      .journal-step { padding: 12px 12px; }
+      .journal-step-detail { font-size: 13px; }
     }
 
-    /* ====================================================
-       レスポンシブ対応（スマホ幅: 640px 以下）
-    ==================================================== */
-    @media (max-width: 640px) {
-      /* サイドバーはハンバーガーで表示/非表示 */
+    /* 文鎮化エンディング: 暗転演出 */
+    #screen-ending-bricked-event.active {
+      background: #1a1a1a;
+      color: #999;
+    }
+    #screen-ending-bricked-event .card {
+      background: #2a2a2a;
+      border-color: #444;
+      color: #aaa;
+    }
+    #screen-ending-bricked-event .ending-title { color: #ddd; }
+    #screen-ending-bricked-event .ending-message { color: #aaa; }
+
+    /* ============================================================
+       演出系: シェイク・グリッチアニメーション
+    ============================================================ */
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      10%,30%,50%,70%,90% { transform: translateX(-6px); }
+      20%,40%,60%,80% { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.5s ease-in-out; }
+
+    @keyframes glitch {
+      0%  { opacity: 1; transform: translateX(0); filter: none; }
+      20% { opacity: 0.8; transform: translateX(-4px); filter: hue-rotate(90deg); }
+      40% { opacity: 0.6; transform: translateX(4px); filter: invert(0.1); }
+      60% { opacity: 0.9; transform: translateX(-2px); filter: hue-rotate(-90deg); }
+      80% { opacity: 0.7; transform: translateX(2px); filter: none; }
+      100%{ opacity: 1; transform: translateX(0); filter: none; }
+    }
+    .glitch { animation: glitch 0.8s step-end infinite; }
+
+    /* オーバーレイ（文鎮化演出などで画面を暗くする） */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      z-index: 500;
+      transition: background 1.5s;
+      pointer-events: none;
+    }
+    #overlay.dim { background: rgba(0,0,0,0.7); }
+
+    /* ============================================================
+       トラブル画面（道中の回復可能イベント表示エリア）
+       各N画面内に hidden/visible で切り替え
+    ============================================================ */
+    .trouble-panel {
+      display: none;
+      border: 2px solid var(--color-danger);
+      border-radius: 8px;
+      background: var(--color-danger-bg);
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+    .trouble-panel.visible { display: block; }
+    .trouble-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-danger);
+      margin-bottom: 8px;
+    }
+    .trouble-hint-box {
+      background: #fffbe6;
+      border: 1px solid #f0e08a;
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 13px;
+      margin: 10px 0;
+    }
+
+    /* サイドバーオーバーレイ（スマホ） */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 150;
+    }
+    #sidebar-overlay.visible { display: block; }
+
+    /* ============================================================
+       レスポンシブ（スマホ: 768px 以下）
+    ============================================================ */
+    @media (max-width: 768px) {
+      /* 右HUDは非表示、トグルボタンで折りたたみ */
+      #hud-panel {
+        position: fixed;
+        top: var(--header-h);
+        right: -300px;
+        width: 280px;
+        height: calc(100vh - var(--header-h));
+        z-index: 250;
+        transition: right 0.25s ease;
+        overflow-y: auto;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+      }
+      #hud-panel.open { right: 0; }
+      #hud-toggle { display: block; }
+
+      /* 左サイドバーもスマホ時はオフキャンバス */
       #sidebar {
         position: fixed;
         top: var(--header-h);
@@ -688,82 +854,64 @@
         transition: left 0.25s ease;
         overflow-y: auto;
       }
-      #sidebar.visible {
-        display: flex; /* visible クラスがついていてもスマホは初期非表示 */
-      }
-      #sidebar.open {
-        left: 0;
-      }
-      /* ハンバーガーボタン表示 */
-      #sidebar-toggle {
-        display: block;
-      }
-      /* サイドバー開いたときのオーバーレイ */
-      #sidebar-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.4);
-        z-index: 150;
-      }
-      #sidebar-overlay.visible {
-        display: block;
-      }
+      #sidebar.open { left: 0; }
+      #sidebar-toggle { display: block; }
 
-      .method-cards {
-        grid-template-columns: 1fr;
-      }
-      .info-grid {
-        grid-template-columns: 1fr;
-      }
-      #log-toggle {
-        display: block;
-      }
-      /* スマホではログパネルを折りたたみ */
-      #log-panel {
-        display: none;
-      }
-      #log-panel.open {
-        display: block;
-      }
-      .screen-inner {
-        padding: 16px 14px;
-      }
+      .method-cards, .conn-cards { grid-template-columns: 1fr; }
+      .info-grid { grid-template-columns: 1fr; }
+      .score-grid { grid-template-columns: 1fr 1fr 1fr; }
+
+      #log-toggle { display: block; }
+      #log-panel  { display: none; }
+      #log-panel.open { display: block; }
+
+      .screen-inner { padding: 16px 14px; }
+    }
+
+    @media (max-width: 480px) {
+      .score-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ====================================================
-       ヘッダー（全画面共通の管理画面上部バー）
-  ==================================================== -->
+  <!-- ============================================================
+       ヘッダー（全画面共通）
+  ============================================================ -->
   <header id="app-header">
     <span class="logo">AS-3200HX 管理コンソール</span>
     <span class="model-badge">架空デバイス</span>
-    <!-- スマホ用ハンバーガーボタン（サイドバーのある画面でのみ使用） -->
+    <!-- ミュートボタン（音が鳴るゲーム開始後に表示） -->
+    <button id="btn-mute" aria-label="ミュート切り替え">🔊 ミュート</button>
+    <!-- スマホ用HUDトグル -->
+    <button id="hud-toggle" onclick="toggleHud()" style="display:none; margin-right:8px; background:#4a90d9; border:none; color:#fff; border-radius:6px; padding:4px 10px; font-size:13px; cursor:pointer;">📖 HUD</button>
+    <!-- スマホ用サイドバートグル -->
     <button id="sidebar-toggle" aria-label="メニューを開く">☰</button>
   </header>
 
-  <!-- セキュリティ警告バナー（初期PW使用時に常時表示） -->
+  <!-- セキュリティ警告バナー -->
   <div id="security-banner">
     ⚠️ 初期パスワードのまま使用されています。セキュリティリスクがあります
   </div>
 
+  <!-- 暗転オーバーレイ（文鎮化演出） -->
+  <div id="overlay"></div>
+
   <!-- サイドバーオーバーレイ（スマホ用） -->
   <div id="sidebar-overlay"></div>
 
-  <!-- ====================================================
-       アプリ本体レイアウト（サイドバー + メインコンテンツ）
-  ==================================================== -->
+  <!-- ============================================================
+       アプリ本体レイアウト
+  ============================================================ -->
   <div id="app-body">
 
-    <!-- サイドバー（step3以降で表示） -->
+    <!-- ---- 左サイドバー（N3以降） ---- -->
     <aside id="sidebar">
       <nav>
         <ul>
-          <li><a href="#" data-menu="internet" onclick="dummyMenu(event, 'インターネット')">インターネット</a></li>
-          <li><a href="#" data-menu="lan"      onclick="dummyMenu(event, 'LAN')">LAN</a></li>
-          <li><a href="#" data-menu="wifi"     onclick="dummyMenu(event, '無線設定')">無線設定</a></li>
+          <li><a href="#" data-menu="internet" onclick="dummyMenu(event,'インターネット')">インターネット</a></li>
+          <li><a href="#" data-menu="lan"      onclick="dummyMenu(event,'LAN')">LAN</a></li>
+          <li><a href="#" data-menu="wifi"     onclick="dummyMenu(event,'無線設定')">無線設定</a></li>
           <li>
             <a href="#" data-menu="fw" id="menu-fw" onclick="goToFirmware(event)">
               ファームウェア更新
@@ -774,23 +922,27 @@
       </nav>
     </aside>
 
-    <!-- メインコンテンツエリア（各スクリーンが切り替わる） -->
+    <!-- ---- メインコンテンツ（画面切り替え） ---- -->
     <div id="main-content">
+
+      <!-- スマホ用ログトグル・ログパネルはここにマウント（後述） -->
 
       <!-- ==================================================
            スクリーン一覧
-           各 section.screen の data-screen 属性で識別する
-           showScreen(id) でアクティブな1つだけ表示
+           showScreen(id) で1つだけ active にする
       ================================================== -->
 
       <!-- ---- スタート画面 ---- -->
       <section class="screen active" data-screen="start" id="screen-start">
         <div class="screen-inner">
-          <h1 class="big-title">ファームウェア更新シミュレーター</h1>
-          <p class="tagline">あなたは更新を完了できるか？　それとも撤退するか？</p>
+          <h1 class="big-title">ファームウェア更新<br>謎解きシミュレーター</h1>
+          <p class="tagline">正しい手順を探り当て、ルーターを最新版に更新せよ！</p>
           <p class="description">
-            これは実在しない架空のルーター管理画面です。<br>
-            実際の操作感を体験しながら、途中でつまずくポイントを学びます。
+            これは架空のルーター管理画面です。<br>
+            ３つの謎 ①型番照合 ②正しい手順 ③警告メッセージの解読 を突破して<br>
+            ファームウェアを正しく更新することが目標です。<br><br>
+            <strong>間違えてもゲームオーバーにはなりません。</strong><br>
+            ヒントを蓄積しながら正解ルートを見つけてください。
           </p>
           <button class="btn btn-primary" id="btn-start" style="font-size:17px; padding:14px 36px;">
             シミュレーション開始
@@ -798,15 +950,17 @@
         </div>
       </section>
 
-      <!-- ---- ステップ1: ルーター本体確認 ---- -->
-      <section class="screen" data-screen="step1" id="screen-step1">
+      <!-- ====================================================
+           N1: ラベル確認
+           目的: 型番「AS-3200HX」を観察させる（謎①の伏線）
+      ==================================================== -->
+      <section class="screen" data-screen="n1" id="screen-n1">
         <div class="screen-inner">
-          <h2 class="screen-title">ステップ 1 — ルーター本体を確認する</h2>
-          <p class="screen-subtitle">機器の底面ラベルを確認して、接続情報をメモしておきましょう。</p>
+          <h2 class="screen-title">N1 — ルーター本体を確認する</h2>
+          <p class="screen-subtitle">機器の底面ラベルをよく観察してください。後で重要な情報が必要になります。</p>
 
           <div class="card">
-            <!-- ルーターSVGイラスト
-                 正面ビュー: 本体ボックス + アンテナ2本 + LED複数 -->
+            <!-- ルーターSVGイラスト（旧版から流用） -->
             <div id="router-svg-wrap">
               <svg viewBox="0 0 300 160" xmlns="http://www.w3.org/2000/svg"
                    aria-label="ルーター正面イラスト" role="img">
@@ -814,43 +968,36 @@
                 <rect x="30" y="60" width="240" height="70" rx="8" ry="8"
                       fill="#e8ecf0" stroke="#9aaabb" stroke-width="2"/>
                 <!-- アンテナ左 -->
-                <line x1="70"  y1="60" x2="55"  y2="10" stroke="#8090a0" stroke-width="4" stroke-linecap="round"/>
+                <line x1="70" y1="60" x2="55" y2="10" stroke="#8090a0" stroke-width="4" stroke-linecap="round"/>
                 <ellipse cx="55" cy="8" rx="5" ry="3" fill="#8090a0"/>
                 <!-- アンテナ右 -->
                 <line x1="230" y1="60" x2="245" y2="10" stroke="#8090a0" stroke-width="4" stroke-linecap="round"/>
                 <ellipse cx="245" cy="8" rx="5" ry="3" fill="#8090a0"/>
                 <!-- 型番シルク印刷 -->
                 <text x="150" y="90" text-anchor="middle" font-size="13"
-                      font-weight="bold" fill="#4a5570" font-family="Arial, sans-serif">
-                  AS-3200HX
-                </text>
-                <!-- LED ランプ群 -->
-                <!-- POWER LED -->
+                      font-weight="bold" fill="#4a5570" font-family="Arial, sans-serif">AS-3200HX</text>
+                <!-- LED群 -->
                 <circle cx="60"  cy="110" r="5" fill="#2ecc71"/>
-                <text x="60"  y="125" text-anchor="middle" font-size="9" fill="#667788">PWR</text>
-                <!-- WAN LED -->
+                <text   x="60"  y="125" text-anchor="middle" font-size="9" fill="#667788">PWR</text>
                 <circle cx="85"  cy="110" r="5" fill="#2ecc71"/>
-                <text x="85"  y="125" text-anchor="middle" font-size="9" fill="#667788">WAN</text>
-                <!-- Wi-Fi LED（点滅アニメ） -->
+                <text   x="85"  y="125" text-anchor="middle" font-size="9" fill="#667788">WAN</text>
                 <circle cx="110" cy="110" r="5" fill="#3498db">
                   <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/>
                 </circle>
                 <text x="110" y="125" text-anchor="middle" font-size="9" fill="#667788">WiFi</text>
-                <!-- LAN1〜4 LED -->
                 <circle cx="155" cy="110" r="4" fill="#f39c12"/>
-                <text x="155" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN1</text>
+                <text   x="155" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN1</text>
                 <circle cx="175" cy="110" r="4" fill="#f39c12"/>
-                <text x="175" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN2</text>
+                <text   x="175" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN2</text>
                 <circle cx="195" cy="110" r="4" fill="#95a5a6"/>
-                <text x="195" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN3</text>
+                <text   x="195" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN3</text>
                 <circle cx="215" cy="110" r="4" fill="#95a5a6"/>
-                <text x="215" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN4</text>
-                <!-- WPS ボタン -->
+                <text   x="215" y="125" text-anchor="middle" font-size="9" fill="#667788">LAN4</text>
                 <rect x="252" y="100" width="12" height="20" rx="3" fill="#ccd4dc"/>
                 <text x="258" y="116" text-anchor="middle" font-size="8" fill="#889" font-weight="bold">WPS</text>
               </svg>
 
-              <!-- 底面ラベル風ボックス -->
+              <!-- 底面ラベル風ボックス（謎①の手がかり: 型番をここで覚える） -->
               <div class="router-label-box">
                 <div class="label-row">
                   <span class="label-key">型番</span>
@@ -864,33 +1011,38 @@
                   <span class="label-key">初期ID</span>
                   <span class="label-val">admin</span>
                 </div>
+                <!-- 初期PWは薄字: 「変更すべき」と気づかせるための演出 -->
                 <div class="label-row">
                   <span class="label-key">初期PW</span>
-                  <!-- 初期パスワードは薄いグレーで目立たせない（意図的な設計） -->
                   <span class="label-val muted">admin</span>
                 </div>
                 <div class="label-row">
                   <span class="label-key">IEEE</span>
-                  <span class="label-val">802.11ax(Wi-Fi 6)</span>
+                  <span class="label-val">802.11ax (Wi-Fi 6)</span>
                 </div>
               </div>
             </div>
 
             <div class="btn-group">
-              <button class="btn btn-primary" id="btn-label-confirmed">ラベルを確認した →</button>
+              <button class="btn btn-primary" id="btn-n1-confirmed">
+                型番を確認した →
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ---- ステップ2: ログイン ---- -->
-      <section class="screen" data-screen="step2" id="screen-step2">
+      <!-- ====================================================
+           N2: ログイン（謎③の入口 / セキュリティ分岐）
+           正解: admin 以外のPWでログイン → passwordChanged=true
+           誤り: admin or 空 → バナー表示のまま進む（減点）
+      ==================================================== -->
+      <section class="screen" data-screen="n2" id="screen-n2">
         <div class="screen-inner">
-          <h2 class="screen-title">ステップ 2 — 管理画面へログイン</h2>
+          <h2 class="screen-title">N2 — 管理画面へログイン</h2>
           <p class="screen-subtitle">確認したラベルの情報でログインします。</p>
 
           <div class="card">
-            <!-- ログインフォーム -->
             <div class="form-group">
               <label for="input-userid">ユーザーID</label>
               <input type="text" id="input-userid" value="admin" autocomplete="username">
@@ -900,45 +1052,48 @@
               <input type="password" id="input-password" placeholder="パスワードを入力"
                      autocomplete="current-password">
             </div>
-
-            <!-- 分岐A のヒント -->
-            <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:14px;">
-              ヒント: 初期パスワード(admin)のまま進むと、セキュリティ警告が表示されます。<br>
-              別のパスワードを入力して「ログイン」すると、警告を回避できます。
+            <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:10px;">
+              ※ 初期パスワード(admin)のまま進めることもできますが、セキュリティ上の警告が表示されます。
             </p>
-
             <div class="btn-group">
-              <!-- 「ログイン」ボタン: 入力パスワードで分岐 -->
-              <button class="btn btn-primary" id="btn-login">ログイン</button>
-              <!-- 「初期設定のまま進める」ボタン: 必ず passwordChanged=false になる -->
+              <button class="btn btn-primary"   id="btn-login">ログイン</button>
               <button class="btn btn-secondary" id="btn-login-default">初期設定のまま進める</button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ---- ステップ3: 管理トップ ---- -->
-      <section class="screen" data-screen="step3" id="screen-step3">
+      <!-- ====================================================
+           N3: 管理トップ（観察ポイント）
+           手がかり1: 現Ver 1.00 / 新Ver 1.11 バッジ
+           手がかり2: 目立たないメンテナンス告知（謎③の伏線）
+      ==================================================== -->
+      <section class="screen" data-screen="n3" id="screen-n3">
         <div class="screen-inner">
           <h2 class="screen-title">管理トップ — ダッシュボード</h2>
 
+          <!-- ファームウェア情報カード（メイン情報） -->
           <div class="card">
             <div class="card-title">ファームウェア情報</div>
-            <!-- 現在バージョンと更新通知バッジ -->
             <div class="fw-version-row">
               <span class="fw-version-label">Ver 1.00</span>
               <span style="font-size:13px; color:var(--color-text-muted);">（2021年リリース）</span>
               <span class="fw-update-badge">新しいバージョンが利用可能 Ver 1.11</span>
             </div>
             <p style="margin-top:12px; font-size:14px; color:var(--color-text-muted);">
-              最新ファームウェアへの更新を推奨します。更新することで安定性とセキュリティが向上します。
+              最新ファームウェアへの更新を推奨します。安定性とセキュリティが向上します。
             </p>
+            <!-- メンテナンス告知: 目立たない位置に配置（謎③: ここを読んでいないと N4 でハマる） -->
+            <div class="maint-notice">
+              [システム通知] 現在オンライン更新サーバーはメンテナンス中です。
+              ご不便をおかけします。(2026-06-15 00:00 〜 終日)
+            </div>
             <div class="btn-group">
               <button class="btn btn-primary" id="btn-go-fw">ファームウェア更新へ →</button>
             </div>
           </div>
 
-          <!-- ルーター情報グリッド -->
+          <!-- デバイス情報グリッド -->
           <div class="card">
             <div class="card-title">デバイス情報</div>
             <div class="info-grid">
@@ -963,15 +1118,38 @@
         </div>
       </section>
 
-      <!-- ---- ステップ4: 更新方法選択 ---- -->
-      <section class="screen" data-screen="step4" id="screen-step4">
+      <!-- ====================================================
+           N4: 更新方法選択（謎③解読）
+           正解: ローカルファイル指定（N3のメンテ告知を読んだ人が気づく）
+           罠: オンライン → 50%で通信エラー、シェイク＋音
+      ==================================================== -->
+      <section class="screen" data-screen="n4" id="screen-n4">
         <div class="screen-inner">
-          <h2 class="screen-title">ファームウェア更新 — 更新方法を選択</h2>
-          <p class="screen-subtitle">ファームウェア Ver 1.00 → Ver 1.11 への更新方法を選んでください。</p>
+          <h2 class="screen-title">N4 — ファームウェア更新方法を選択</h2>
+          <p class="screen-subtitle">Ver 1.00 → Ver 1.11 への更新方法を選んでください。</p>
 
-          <div class="card">
-            <!-- 分岐B: オンライン or ローカル -->
-            <div class="method-cards" id="method-cards">
+          <!-- トラブルパネル: オンライン選択時に表示（インライン、行き止まりにしない） -->
+          <div class="trouble-panel" id="trouble-n4">
+            <div class="trouble-title">⚠️ 通信エラー：サーバーに接続できません</div>
+            <div class="progress-wrap">
+              <div class="progress-bar error" id="n4-progress-bar" style="width:50%"></div>
+            </div>
+            <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:8px;">
+              接続エラー (Error 503: Service Unavailable)<br>
+              オンライン更新サーバーへの接続に失敗しました。
+            </p>
+            <div class="trouble-hint-box">
+              💡 <strong>ヒント：</strong>N3（管理トップ）に小さく書いてありませんでしたか？
+              「メンテナンス中」の時はオンライン更新は使えません。<strong>ローカルファイル指定</strong>を試しましょう。
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-secondary" id="btn-n4-back-from-trouble">← 戻ってやり直す</button>
+            </div>
+          </div>
+
+          <!-- 通常の選択カード -->
+          <div class="card" id="n4-card-normal">
+            <div class="method-cards">
               <div class="method-card" id="card-online" onclick="selectOnline()">
                 <span class="method-icon">🌐</span>
                 <div class="method-name">オンラインバージョンアップ</div>
@@ -983,118 +1161,127 @@
                 <div class="method-desc">ダウンロード済みのファイルを手動で適用</div>
               </div>
             </div>
-
-            <!-- オンラインエラーエリア（オンライン選択後に表示） -->
-            <div id="online-error-area">
-              <div class="progress-wrap">
-                <div class="progress-bar" id="online-progress-bar"></div>
-              </div>
-              <p class="progress-label" id="online-progress-label">0%</p>
-
-              <!-- エラーメッセージ（50%で表示） -->
-              <div class="alert alert-danger" id="online-error-msg" style="display:none;">
-                <strong>通信エラー：</strong>サーバーに接続できません<br>
-                <span style="font-size:12px; color:#999;">Error: Connection timed out (code: 503)</span>
-              </div>
-              <div class="btn-group" id="online-retry-btns" style="display:none;">
-                <button class="btn btn-secondary" id="btn-online-retry">もう一度試す</button>
-                <button class="btn btn-primary"   id="btn-switch-local">ローカルファイル指定に切り替える</button>
-              </div>
-            </div>
-
-            <!-- ローカルファイル指定エリア（ローカル選択 or オンラインエラーからの切り替え後） -->
-            <div id="local-file-area">
-              <p style="font-size:14px; margin-bottom:10px;">
-                事前にメーカーサイトからダウンロードしたファームウェアファイルを指定します。
-              </p>
-              <!-- ダミーのファイル選択ボタン（実際の選択処理は不要） -->
-              <button class="btn btn-secondary" id="btn-pick-file">ファイルを選択</button>
-              <div class="file-selected-box" id="file-name-display">（未選択）</div>
-              <div class="btn-group">
-                <!-- ファイル選択後に有効化される -->
-                <button class="btn btn-primary" id="btn-exec-update" disabled>更新実行 →</button>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      <!-- ---- ステップ5: 更新確認 ---- -->
-      <section class="screen" data-screen="step5" id="screen-step5">
+      <!-- ====================================================
+           N5: ファイル選択（謎①型番照合）
+           正解: wsr_as3200hx_jp_111.bin（型番一致・最新版）
+           罠1: 別型番 AS-5400DX → 型番不一致トラブル
+           罠2: beta版 → β版は不安定トラブル
+           罠3: 旧版 100 → 現在と同じバージョントラブル
+      ==================================================== -->
+      <section class="screen" data-screen="n5" id="screen-n5">
         <div class="screen-inner">
-          <h2 class="screen-title">ファームウェア更新 — 最終確認</h2>
+          <h2 class="screen-title">N5 — ファームウェアファイルを選択</h2>
+          <p class="screen-subtitle">メーカーサイトからダウンロードしたファイルを選んでください。</p>
 
-          <div class="card">
-            <!-- 分岐C: 実行 or キャンセル -->
-            <div class="alert alert-warning">
-              <strong>⚠️ 警告</strong><br>
-              本当に更新しますか？<br>
-              <strong>更新中は電源を切らないでください。</strong>途中で電源が切れると、ルーターが起動しなくなる可能性があります。
-            </div>
-            <p style="font-size:14px; margin-bottom:8px;">更新内容:</p>
-            <ul style="font-size:14px; padding-left:20px; margin-bottom:16px; color:var(--color-text-muted);">
-              <li>Ver 1.00 → Ver 1.11</li>
-              <li>セキュリティパッチ適用</li>
-              <li>Wi-Fi接続安定性の改善</li>
-            </ul>
+          <!-- トラブルパネル: ファイル誤選択時に表示 -->
+          <div class="trouble-panel" id="trouble-n5">
+            <div class="trouble-title" id="trouble-n5-title">⚠️ ファームウェアエラー</div>
+            <p id="trouble-n5-msg" style="font-size:14px; margin-bottom:8px;"></p>
+            <div class="trouble-hint-box" id="trouble-n5-hint"></div>
             <div class="btn-group">
-              <button class="btn btn-danger"     id="btn-execute">実行する →</button>
-              <button class="btn btn-secondary"  id="btn-cancel">キャンセルして戻る</button>
+              <button class="btn btn-secondary" id="btn-n5-back">← 別のファイルを選ぶ</button>
             </div>
+          </div>
+
+          <!-- ファイル候補リスト（正常時に表示） -->
+          <div class="card" id="n5-card-files">
+            <div class="card-title">ファームウェアファイル候補</div>
+            <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:12px;">
+              ※ ラベルで確認した型番（<strong>AS-3200HX</strong>）と、管理画面で確認した現在バージョン（<strong>Ver 1.00</strong>）を参考に選んでください。
+            </p>
+            <ul class="file-list">
+              <!-- 正解ファイル -->
+              <li class="file-item" onclick="selectFile('correct')" title="型番 AS-3200HX の正式版 Ver 1.11">
+                <span class="file-icon">📄</span>
+                <span><code>wsr_as3200hx_jp_111.bin</code><br>
+                  <span style="font-size:11px; color:var(--color-text-muted);">サイズ: 12.4 MB / 更新日: 2026-03-15</span></span>
+              </li>
+              <!-- 罠1: 別型番 -->
+              <li class="file-item" onclick="selectFile('wrong-model')" title="AS-5400DX用（別機種）">
+                <span class="file-icon">📄</span>
+                <span><code>wsr_as5400dx_jp_120.bin</code><br>
+                  <span style="font-size:11px; color:var(--color-text-muted);">サイズ: 14.1 MB / 更新日: 2026-05-01</span></span>
+              </li>
+              <!-- 罠2: beta版 -->
+              <li class="file-item" onclick="selectFile('beta')" title="β版（不安定）">
+                <span class="file-icon">📄</span>
+                <span><code>as3200hx_beta_200.bin</code><br>
+                  <span style="font-size:11px; color:var(--color-text-muted);">サイズ: 13.0 MB / 更新日: 2026-06-01 [BETA]</span></span>
+              </li>
+              <!-- 罠3: 旧版（現在と同じ） -->
+              <li class="file-item" onclick="selectFile('old')" title="Ver 1.00（現在と同じ）">
+                <span class="file-icon">📄</span>
+                <span><code>as3200hx_jp_100.bin</code><br>
+                  <span style="font-size:11px; color:var(--color-text-muted);">サイズ: 11.8 MB / 更新日: 2021-04-20</span></span>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
 
-      <!-- ---- ステップ6: 更新プロセス ---- -->
-      <section class="screen" data-screen="step6" id="screen-step6">
+      <!-- ====================================================
+           N6: 接続方法の確認（謎②手順/中断トラブルの発生源）
+           正解: 有線（LANケーブル）
+           罠: 無線 → 80%で切断、シェイク→復旧→N6に戻す
+      ==================================================== -->
+      <section class="screen" data-screen="n6" id="screen-n6">
         <div class="screen-inner">
-          <h2 class="screen-title">ファームウェア更新 — 更新中</h2>
+          <h2 class="screen-title">N6 — 接続方法を確認</h2>
+          <p class="screen-subtitle">更新中のルーターとの接続方法を選んでください。</p>
 
-          <div class="card">
-            <div class="alert alert-warning" style="font-family: monospace;">
-              更新中... 絶対に電源を切らないでください<br>
-              Do NOT power off the device during update.
-            </div>
-
-            <!-- プログレスバー -->
+          <!-- トラブルパネル: 無線選択後の切断トラブル -->
+          <div class="trouble-panel" id="trouble-n6">
+            <div class="trouble-title">⚠️ 通信が切断されました（無線が不安定）</div>
             <div class="progress-wrap">
-              <div class="progress-bar" id="update-progress-bar"></div>
+              <div class="progress-bar error" id="n6-progress-bar" style="width:80%"></div>
             </div>
-            <p class="progress-label" id="update-progress-label">0%</p>
-
-            <!-- ターミナル風ログ -->
-            <div class="terminal-log" id="update-terminal-log">$ Starting firmware update...\n</div>
-
-            <!-- 分岐D: プログレスが少し進んだあとに選択肢を表示 -->
-            <!-- 学習者が全エンディングを体験できるようボタン選択方式を採用 -->
-            <div id="update-choice-area">
-              <p style="font-size:14px; margin: 14px 0 6px; font-weight:600;">
-                このあとどの体験をしますか？（学習用の選択）
-              </p>
+            <p style="font-size:14px; color:var(--color-danger); margin-bottom:8px; font-weight:600;">
+              更新プロセスが80%で中断されました。
+            </p>
+            <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:10px;">
+              無線(Wi-Fi)接続は更新中に切断されることがあります。<br>
+              緊急再起動を試みます…
+            </p>
+            <!-- 復旧演出エリア（doWirelessRecovery()で表示） -->
+            <div id="n6-recovery-area" style="display:none;">
+              <div class="alert alert-success">
+                ✅ 再起動後、正常に動作していることを確認できました。<br>
+                ルーターは旧バージョン(Ver 1.00)で起動しています。再度更新してください。
+              </div>
+              <div class="trouble-hint-box">
+                💡 <strong>ヒント獲得：</strong>更新は必ず<strong>有線（LANケーブル）</strong>で行いましょう。
+                無線はファームウェア更新中に切断されるリスクがあります。
+              </div>
               <div class="btn-group">
-                <button class="btn btn-success"  id="btn-normal-complete">通常完了（成功エンディングへ）</button>
-                <button class="btn btn-danger"   id="btn-trouble-simulate">中断トラブルを体験する</button>
+                <button class="btn btn-primary" id="btn-n6-retry">← 有線に切り替えて再挑戦</button>
               </div>
             </div>
-
-            <!-- 中断後の再起動選択（中断トラブル選択時に表示） -->
-            <div id="reboot-choice-area">
-              <div class="alert alert-danger" id="disconnect-msg">
-                ⚠️ 通信が切断されました。更新処理が中断されています。
-              </div>
-              <p style="font-size:14px; margin-bottom:8px; font-weight:600;">再起動を試しますか？</p>
+            <div id="n6-reboot-btn-area">
               <div class="btn-group">
-                <button class="btn btn-primary" id="btn-reboot">再起動を試す</button>
+                <button class="btn btn-warning" id="btn-n6-reboot">緊急再起動を試す</button>
               </div>
-              <!-- 再起動後の結果選択 -->
-              <div id="reboot-result-area" style="display:none;">
-                <p style="font-size:14px; margin: 14px 0 6px; font-weight:600;">
-                  再起動の結果を選んでください（学習用の選択）:
-                </p>
-                <div class="btn-group">
-                  <button class="btn btn-success" id="btn-recovery">復旧した（復旧エンディングへ）</button>
-                  <button class="btn btn-danger"  id="btn-bricked">文鎮化（応答なし）（最悪ケースへ）</button>
-                </div>
+            </div>
+          </div>
+
+          <!-- 通常の接続方法選択カード -->
+          <div class="card" id="n6-card-normal">
+            <div class="alert alert-warning" style="margin-bottom:14px;">
+              ⚠️ ファームウェア更新中の接続が途切れると、更新が失敗する可能性があります。
+            </div>
+            <div class="conn-cards">
+              <div class="conn-card" onclick="selectConnection('wired')">
+                <span class="conn-icon">🔌</span>
+                <div class="conn-name">有線（LANケーブル）</div>
+                <div class="conn-desc">安定した接続。ルーターとPCをケーブルで直接つなぐ</div>
+              </div>
+              <div class="conn-card" onclick="selectConnection('wireless')">
+                <span class="conn-icon">📡</span>
+                <div class="conn-name">無線（Wi-Fi）のまま</div>
+                <div class="conn-desc">現在のWi-Fi接続のまま更新する</div>
               </div>
             </div>
           </div>
@@ -1102,26 +1289,117 @@
       </section>
 
       <!-- ====================================================
-           エンディング画面（4種）
-           共通要素: 操作ログ振り返り + もう一度ボタン + 分岐の説明文
+           N7: 更新確認（撤退の分岐）
+           警告文「電源を切らないでください」が謎③最後の手がかり
       ==================================================== -->
+      <section class="screen" data-screen="n7" id="screen-n7">
+        <div class="screen-inner">
+          <h2 class="screen-title">N7 — 更新 最終確認</h2>
 
-      <!-- ---- エンディング1: 完全成功 ---- -->
+          <div class="card">
+            <div class="alert alert-warning">
+              <strong>⚠️ 警告 — 必ずお読みください</strong><br><br>
+              本当に更新しますか？<br>
+              <strong>更新中は電源を切らないでください。</strong><br>
+              途中で電源が切れたり、画面を閉じたりすると、ルーターが起動しなくなる可能性があります。
+            </div>
+            <p style="font-size:14px; margin-bottom:8px;">更新内容:</p>
+            <ul style="font-size:14px; padding-left:20px; margin-bottom:16px; color:var(--color-text-muted);">
+              <li>ファームウェア: Ver 1.00 → Ver 1.11</li>
+              <li>セキュリティパッチ適用（CVE-2025-xxxx 等）</li>
+              <li>Wi-Fi接続安定性の改善</li>
+            </ul>
+            <div class="btn-group">
+              <button class="btn btn-danger"    id="btn-n7-execute">実行する →</button>
+              <button class="btn btn-secondary" id="btn-n7-cancel">キャンセル（撤退）</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           N8: 更新プロセス（謎③最終関門）
+           途中に「× 閉じる/中断」ボタンを表示（誘惑ボタン）
+           押す → 文鎮化イベント → ヒント → N8へ戻す
+           完了まで待つ → 成功エンディング
+      ==================================================== -->
+      <section class="screen" data-screen="n8" id="screen-n8">
+        <div class="screen-inner">
+          <h2 class="screen-title">N8 — ファームウェア更新中</h2>
+
+          <div class="card">
+            <!-- 更新中注意書き（等幅・ログ風） -->
+            <div class="alert alert-dark" id="n8-warn-msg">
+              更新中... 絶対に電源を切らないでください<br>
+              Do NOT power off the device during update.<br>
+              Do NOT close this window.
+            </div>
+
+            <!-- プログレスバー -->
+            <div class="progress-wrap">
+              <div class="progress-bar" id="n8-progress-bar"></div>
+            </div>
+            <p class="progress-label" id="n8-progress-label">0%</p>
+
+            <!-- ターミナル風ログ -->
+            <div class="terminal-log" id="n8-terminal-log">$ Starting firmware update process...<br></div>
+
+            <!-- 誘惑ボタン: プログレス途中で表示（謎③の罠） -->
+            <!-- 学習者が「閉じる」を押したくなるように意図的にボタンを配置 -->
+            <div id="n8-abort-area" style="display:none; margin-top:14px;">
+              <button class="btn btn-secondary btn-full" id="btn-abort-update">
+                × 閉じる / 中断する
+              </button>
+              <p style="font-size:11px; color:var(--color-text-muted); text-align:center; margin-top:4px;">
+                ※ 更新が終わるまで押さないでください
+              </p>
+            </div>
+
+            <!-- 文鎮化トラブルパネル（インライン、N8内で復旧させる） -->
+            <div class="trouble-panel" id="trouble-n8" style="margin-top:14px;">
+              <div class="trouble-title" id="trouble-n8-title">💀 ルーターが応答しなくなりました…</div>
+              <p style="font-size:14px; color:var(--color-text-muted); margin-bottom:10px;" id="trouble-n8-msg">
+                更新中に中断したため、ファームウェアが壊れた状態になりました。<br>
+                現実ではこれが「文鎮化」です。
+              </p>
+              <div class="trouble-hint-box">
+                💡 <strong>ヒント獲得（重要）：</strong>
+                更新中の中断・電源断は<strong>文鎮化</strong>の原因です。
+                N7の警告文にも書いてありました。<strong>完了まで絶対に触らない！</strong>
+              </div>
+              <div class="alert alert-danger" style="font-size:13px; margin-top:10px;">
+                ❌ 緊急処置により強制初期化しました。<br>
+                Ver 1.00 に戻しました。もう一度挑戦してください。
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-warning" id="btn-n8-retry">← もう一度 N8 から挑戦</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           エンディング1: 完全成功（passwordChanged=true）
+      ==================================================== -->
       <section class="screen" data-screen="ending-success" id="screen-ending-success">
         <div class="screen-inner">
           <div class="card">
             <span class="ending-icon">🎉</span>
             <h2 class="ending-title">ファームウェア更新が完了しました（Ver 1.11）</h2>
             <p class="ending-message">
-              お疲れ様でした！最後まで完了できました。<br>
-              ルーターが最新のファームウェアで動作しています。
+              お疲れ様でした！すべての謎を解いて、正しく更新できました。<br>
+              ルーターが最新のファームウェアで安全に動作しています。
             </p>
             <div class="alert alert-success">
               ✅ 更新成功: Ver 1.00 → Ver 1.11<br>
-              セキュリティパッチが適用されました。
+              セキュリティパッチ適用 / 接続安定性向上
             </div>
+            <!-- スコア表示 -->
+            <div id="ending-score-success"></div>
+            <!-- 手順の解説（ふりかえりジャーナル） -->
+            <div class="journal-recap" id="journal-recap-success"></div>
             <p class="ending-hint">分岐の選択によって結果が変わります。もう一度試して、別のルートを体験してみましょう。</p>
-            <!-- ログ振り返り -->
             <p style="font-size:13px; font-weight:600; margin-bottom:6px;">📋 操作ログの振り返り:</p>
             <div class="ending-log-review" id="log-review-success"></div>
             <div class="btn-group">
@@ -1131,7 +1409,39 @@
         </div>
       </section>
 
-      <!-- ---- エンディング2: 撤退 ---- -->
+      <!-- ====================================================
+           エンディング2: 成功（要セキュリティ改善）passwordChanged=false
+      ==================================================== -->
+      <section class="screen" data-screen="ending-success-insecure" id="screen-ending-success-insecure">
+        <div class="screen-inner">
+          <div class="card">
+            <span class="ending-icon">⚠️</span>
+            <h2 class="ending-title">更新は完了しましたが…</h2>
+            <p class="ending-message">
+              ファームウェアは更新できましたが、初期パスワードのままです。<br>
+              セキュリティ上のリスクが残っています。
+            </p>
+            <div class="alert alert-warning">
+              ⚠️ パスワードが初期値「admin」のままです。<br>
+              次回は最初にパスワードを変更しましょう！
+            </div>
+            <!-- スコア表示 -->
+            <div id="ending-score-insecure"></div>
+            <!-- 手順の解説（ふりかえりジャーナル） -->
+            <div class="journal-recap" id="journal-recap-insecure"></div>
+            <p class="ending-hint">分岐の選択によって結果が変わります。もう一度試して、別のルートを体験してみましょう。</p>
+            <p style="font-size:13px; font-weight:600; margin-bottom:6px;">📋 操作ログの振り返り:</p>
+            <div class="ending-log-review" id="log-review-success-insecure"></div>
+            <div class="btn-group">
+              <button class="btn btn-primary btn-full" id="btn-restart-insecure">もう一度シミュレーションする</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           エンディング3: 撤退（N7でキャンセル）
+      ==================================================== -->
       <section class="screen" data-screen="ending-retreat" id="screen-ending-retreat">
         <div class="screen-inner">
           <div class="card">
@@ -1139,12 +1449,17 @@
             <h2 class="ending-title">更新を中止しました</h2>
             <p class="ending-message">
               ここで撤退するのも立派な判断です。<br>
-              『どこで・なぜやめたか』を記録することが、この課題では完了することと同じくらい価値があります。
+              『どこで・なぜやめたか』を記録することが、<br>
+              この課題では完了することと同じくらい価値があります。
             </p>
             <div class="alert alert-info">
               実際の作業でも「わからなくなったら早めに止める」判断は重要です。<br>
               問題が小さいうちに撤退する方が、被害を最小限に抑えられます。
             </div>
+            <!-- スコア表示 -->
+            <div id="ending-score-retreat"></div>
+            <!-- 手順の解説（ふりかえりジャーナル） -->
+            <div class="journal-recap" id="journal-recap-retreat"></div>
             <p class="ending-hint">分岐の選択によって結果が変わります。もう一度試して、別のルートを体験してみましょう。</p>
             <p style="font-size:13px; font-weight:600; margin-bottom:6px;">📋 操作ログの振り返り:</p>
             <div class="ending-log-review" id="log-review-retreat"></div>
@@ -1155,225 +1470,540 @@
         </div>
       </section>
 
-      <!-- ---- エンディング3: 復旧 ---- -->
-      <section class="screen" data-screen="ending-recovery" id="screen-ending-recovery">
-        <div class="screen-inner">
-          <div class="card">
-            <span class="ending-icon">🔧</span>
-            <h2 class="ending-title">再起動後、正常に動作していることを確認できました</h2>
-            <p class="ending-message">
-              トラブルが起きても、慌てず確認することが大切です。<br>
-              再起動で復旧できたのは、ファームウェアが一部書き込まれていたためです。
-            </p>
-            <div class="alert alert-success">
-              ✅ 復旧確認: ルーターは正常起動中<br>
-              ファームウェアバージョン: Ver 1.11（更新成功）
-            </div>
-            <p class="ending-hint">分岐の選択によって結果が変わります。もう一度試して、別のルートを体験してみましょう。</p>
-            <p style="font-size:13px; font-weight:600; margin-bottom:6px;">📋 操作ログの振り返り:</p>
-            <div class="ending-log-review" id="log-review-recovery"></div>
-            <div class="btn-group">
-              <button class="btn btn-primary btn-full" id="btn-restart-recovery">もう一度シミュレーションする</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---- エンディング4: 文鎮化（画面暗転演出） ---- -->
-      <section class="screen" data-screen="ending-bricked" id="screen-ending-bricked">
-        <div class="screen-inner">
-          <div class="card">
-            <span class="ending-icon">💀</span>
-            <h2 class="ending-title">ルーターが応答しなくなりました</h2>
-            <p class="ending-message">
-              これは実機では絶対に避けたい事態です。<br>
-              シミュレーターだからこそ体験できる『最悪のケース』でした。<br><br>
-              実際に挑戦する際は、必ず手順を守り、わからなくなったら早めに撤退しましょう。
-            </p>
-            <div class="alert alert-danger">
-              ❌ 文鎮化: デバイスが応答しません<br>
-              <span style="font-size:12px;">復旧には専門業者によるJTAG/UART接続が必要な場合があります</span>
-            </div>
-            <p class="ending-hint">分岐の選択によって結果が変わります。もう一度試して、別のルートを体験してみましょう。</p>
-            <p style="font-size:13px; font-weight:600; margin-bottom:6px;">📋 操作ログの振り返り:</p>
-            <div class="ending-log-review" id="log-review-bricked"></div>
-            <div class="btn-group">
-              <button class="btn btn-secondary btn-full" id="btn-restart-bricked">もう一度シミュレーションする</button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- ====================================================
+           文鎮化イベント（道中回復可能・N8内のパネルで処理）
+           ※ 独立エンディング画面にはしない
+      ==================================================== -->
 
     </div><!-- /#main-content -->
+
+    <!-- ============================================================
+         右側HUDパネル（常設: スコア/進行マップ/ヒント手帳/操作ログ）
+    ============================================================ -->
+    <aside id="hud-panel" class="hidden">
+
+      <!-- スコアHUD -->
+      <div class="hud-section">
+        <div class="hud-heading">スコア</div>
+        <div id="hud-score-grid">
+          <div class="hud-score-item">
+            <div class="hud-score-val" id="hud-mistakes">0</div>
+            <div class="hud-score-lbl">ミス</div>
+          </div>
+          <div class="hud-score-item">
+            <div class="hud-score-val" id="hud-hints">0</div>
+            <div class="hud-score-lbl">ヒント</div>
+          </div>
+          <div class="hud-score-item" style="grid-column:span 2;">
+            <div class="hud-score-val" id="hud-time">0:00</div>
+            <div class="hud-score-lbl">経過時間</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 進行マップ（N1〜N8） -->
+      <div class="hud-section">
+        <div class="hud-heading">進行マップ</div>
+        <div id="map-nodes">
+          <!-- renderMap() で動的生成 -->
+        </div>
+      </div>
+
+      <!-- ヒント手帳 -->
+      <div class="hud-section">
+        <div class="hud-heading">📖 ヒント手帳</div>
+        <p id="hint-empty" style="font-size:12px; color:var(--color-text-muted); font-style:italic;">
+          まだヒントはありません
+        </p>
+        <ul id="hint-list"></ul>
+      </div>
+
+      <!-- 操作ログ（コンパクト） -->
+      <div class="hud-section">
+        <div class="hud-heading">操作ログ</div>
+        <div id="hud-log-lines"></div>
+      </div>
+
+    </aside>
+
   </div><!-- /#app-body -->
 
-  <!-- ====================================================
-       操作ログパネル（常設、画面下部）
-       等幅フォントでターミナル風に表示
-  ==================================================== -->
-  <!-- スマホ用折りたたみトグル -->
+  <!-- ============================================================
+       操作ログパネル（画面下部、HUDが隠れるスマホ向け）
+  ============================================================ -->
   <button id="log-toggle" onclick="toggleLog()">▶ 操作ログを表示</button>
   <div id="log-panel">
     <div class="log-heading">操作ログ（OPERATION LOG）</div>
     <div id="log-lines"></div>
   </div>
 
-  <!-- ====================================================
-       フッター（全画面共通）
-  ==================================================== -->
+  <!-- ============================================================
+       フッター
+  ============================================================ -->
   <footer>
-    社会情報学実習 上級課題 シミュレーター &nbsp;|&nbsp; 2026-06-12
+    社会情報学実習 上級課題 シミュレーター &nbsp;|&nbsp; 2026-06-15
   </footer>
 
-  <!-- ====================================================
+  <!-- ============================================================
        JavaScript
-       バニラJSのみ。フレームワーク禁止。
+       バニラJS のみ。外部ライブラリ禁止。
        addEventListener で全ボタン配線。
-  ==================================================== -->
+  ============================================================ -->
   <script>
     'use strict';
 
-    // ========================================================
-    // 状態管理オブジェクト
-    // このオブジェクトが「今どこまで進んでいるか」を保持する
-    // ========================================================
-    let state = {
-      passwordChanged: false,  // true: パスワードを変更してログイン / false: 初期PW使用
-      updateMethod: null,      // 'online' | 'local': 選んだ更新方法
-      filePicked: false,       // ローカルファイルを選択済みか
-      logs: []                 // 操作ログの文字列配列
+    // ============================================================
+    // 定数: 進行マップ用ノード定義
+    // ============================================================
+    var MAP_NODES = [
+      { id: 'n1', label: 'N1 ラベル確認' },
+      { id: 'n2', label: 'N2 ログイン' },
+      { id: 'n3', label: 'N3 管理トップ' },
+      { id: 'n4', label: 'N4 更新方法' },
+      { id: 'n5', label: 'N5 ファイル選択' },
+      { id: 'n6', label: 'N6 接続確認' },
+      { id: 'n7', label: 'N7 最終確認' },
+      { id: 'n8', label: 'N8 更新プロセス' }
+    ];
+
+    // ============================================================
+    // 状態管理オブジェクト (state)
+    // ここを見れば「今どこで何が起きているか」が分かる
+    // ============================================================
+    var state = {
+      passwordChanged: false,  // N2: true=PW変更済み / false=初期PW使用
+      mistakes: 0,             // 誤選択の回数（++で計算）
+      hints: [],               // ヒント手帳（重複なし文字列配列）
+      logs: [],                // 操作ログ（時刻付き文字列配列）
+      journal: [],             // ふりかえりジャーナル（{title, detail} の配列）
+      startTime: null,         // Date オブジェクト（N1ラベル確認時に記録）
+      currentNode: null,       // 現在のノードID ('n1' 〜 'n8')
+      visitedNodes: [],        // 通過済みノードID配列
+      trapNodes: {},           // 罠を踏んだノード { n4: true, ... }
+      timerInterval: null,     // HUDタイマーのインターバル参照
+      audioCtx: null,          // Web Audio API の AudioContext
+      muted: false             // ミュート状態
     };
 
-    // ========================================================
+    // ============================================================
+    // Web Audio API: 効果音ユーティリティ
+    // 外部ファイル不要、すべてオシレーターで生成
+    // ============================================================
+
+    // AudioContext を初期化（最初のユーザー操作後に呼ぶ）
+    function ensureAudioCtx() {
+      if (!state.audioCtx) {
+        try {
+          state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { /* 非対応ブラウザは無音 */ }
+      }
+    }
+
+    // 基本音を鳴らす汎用関数
+    // type: 'sine'|'square'|'sawtooth', freq: Hz, duration: 秒, gain: 音量
+    function playTone(type, freq, duration, gain) {
+      if (state.muted || !state.audioCtx) return;
+      try {
+        var ctx = state.audioCtx;
+        var osc = ctx.createOscillator();
+        var gainNode = ctx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = freq || 440;
+        gainNode.gain.setValueAtTime(gain || 0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    // クリック音（短い高音）
+    function sfxClick() { playTone('sine', 880, 0.05, 0.15); }
+    // 正解音（上昇アルペジオ）
+    function sfxSuccess() {
+      if (state.muted || !state.audioCtx) return;
+      [523, 659, 784, 1047].forEach(function(f, i) {
+        setTimeout(function() { playTone('sine', f, 0.15, 0.2); }, i * 80);
+      });
+    }
+    // エラー/警告音（下降ビープ）
+    function sfxError() {
+      if (state.muted || !state.audioCtx) return;
+      [400, 300, 200].forEach(function(f, i) {
+        setTimeout(function() { playTone('square', f, 0.12, 0.2); }, i * 100);
+      });
+    }
+    // 文鎮化の低いノイズ
+    function sfxBricked() {
+      if (state.muted || !state.audioCtx) return;
+      try {
+        var ctx = state.audioCtx;
+        // 低い唸り音を数回
+        [80, 60, 40].forEach(function(f, i) {
+          setTimeout(function() { playTone('sawtooth', f, 0.4, 0.3); }, i * 200);
+        });
+      } catch(e) {}
+    }
+
+    // ============================================================
+    // ミュートトグル
+    // ============================================================
+    function toggleMute() {
+      state.muted = !state.muted;
+      var btn = document.getElementById('btn-mute');
+      btn.textContent = state.muted ? '🔇 ミュート中' : '🔊 ミュート';
+    }
+
+    // ============================================================
     // showScreen(id) — 画面切り替えの中心関数
-    // id: data-screen 属性の値 (例: "step1", "ending-success")
-    // ========================================================
+    // id: data-screen 属性の値
+    // ============================================================
     function showScreen(id) {
-      // 全スクリーンの active クラスを外す
       document.querySelectorAll('.screen').forEach(function(s) {
         s.classList.remove('active');
       });
-      // 指定スクリーンに active を付ける
       var target = document.querySelector('[data-screen="' + id + '"]');
-      if (target) {
-        target.classList.add('active');
-      }
+      if (target) target.classList.add('active');
 
-      // サイドバーは step3 以降の画面でのみ表示する
-      var showSidebar = ['step3', 'step4', 'step5', 'step6'].includes(id);
+      // サイドバー: N3以降のノード画面と更新フロー画面で表示
+      var sidebarScreens = ['n3', 'n4', 'n5', 'n6', 'n7', 'n8'];
+      var showSidebar = sidebarScreens.includes(id);
       document.getElementById('sidebar').classList.toggle('visible', showSidebar);
 
-      // 画面上部にスクロール（スマホ対応）
+      // HUD: ゲーム開始後（N1以降）は表示
+      var inGame = (id !== 'start');
+      document.getElementById('hud-panel').classList.toggle('hidden', !inGame);
+
+      // ミュートボタン: ゲーム開始後に表示
+      document.getElementById('btn-mute').style.display = inGame ? 'inline-block' : 'none';
+
+      // スマホHUDトグルボタン: ゲーム中のみ
+      var hudToggle = document.querySelector('#app-header button[onclick="toggleHud()"]');
+      if (hudToggle) hudToggle.style.display = inGame ? 'inline-block' : 'none';
+
+      // 上部へスクロール
       window.scrollTo(0, 0);
     }
 
-    // ========================================================
-    // addLog(text) — 操作ログに1行追記する
-    // ログパネルにリアルタイムで表示し、state.logs にも保存
-    // ========================================================
+    // ============================================================
+    // addLog(text) — 操作ログに追記
+    // ============================================================
     function addLog(text) {
-      var timestamp = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-      var line = '[' + timestamp + '] ' + text;
+      var ts = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+      var line = '[' + ts + '] ' + text;
       state.logs.push(line);
 
+      // 下部ログパネル
       var el = document.getElementById('log-lines');
       el.textContent += line + '\n';
-      // ログパネルを一番下にスクロール
       var panel = document.getElementById('log-panel');
       panel.scrollTop = panel.scrollHeight;
+
+      // HUD内ログ
+      var hudLog = document.getElementById('hud-log-lines');
+      hudLog.textContent += line + '\n';
+      hudLog.scrollTop = hudLog.scrollHeight;
     }
 
-    // ========================================================
-    // updateSecurityBanner() — セキュリティ警告バナーの表示更新
-    // passwordChanged=false のときだけバナーを見せる
-    // ========================================================
+    // ============================================================
+    // addHint(text) — ヒント手帳に追加（重複なし）
+    // ============================================================
+    function addHint(text) {
+      if (state.hints.indexOf(text) !== -1) return; // 重複チェック
+      state.hints.push(text);
+
+      var empty = document.getElementById('hint-empty');
+      if (empty) empty.style.display = 'none';
+
+      var list = document.getElementById('hint-list');
+      var li = document.createElement('li');
+      li.textContent = text;
+      list.appendChild(li);
+
+      // HUDのヒント数を更新
+      document.getElementById('hud-hints').textContent = state.hints.length;
+
+      addLog('> 💡 ヒント獲得: ' + text);
+    }
+
+    // ============================================================
+    // updateSecurityBanner() — セキュリティ警告バナー更新
+    // ============================================================
     function updateSecurityBanner() {
       var banner = document.getElementById('security-banner');
-      if (state.passwordChanged) {
-        banner.classList.remove('visible');
-      } else {
-        banner.classList.add('visible');
-      }
+      banner.classList.toggle('visible', !state.passwordChanged);
     }
 
-    // ========================================================
-    // resetState() — 状態をリセットしてスタート画面に戻す
-    // 「もう一度シミュレーション」ボタンから呼ばれる
-    // ========================================================
+    // ============================================================
+    // renderMap() — 進行マップを再描画
+    // 状態に応じてノードの見た目を更新する
+    // ============================================================
+    function renderMap() {
+      var container = document.getElementById('map-nodes');
+      container.innerHTML = '';
+      MAP_NODES.forEach(function(node) {
+        var div = document.createElement('div');
+        div.className = 'map-node';
+        var icon = '⬜';
+        if (state.trapNodes[node.id]) {
+          div.classList.add('trap');
+          icon = '⚠️';
+        }
+        if (state.visitedNodes.indexOf(node.id) !== -1) {
+          div.classList.add('done');
+          icon = '✅';
+        }
+        if (node.id === state.currentNode) {
+          div.classList.add('current');
+          icon = '▶';
+        }
+        if (state.visitedNodes.indexOf(node.id) === -1 && node.id !== state.currentNode) {
+          div.classList.add('locked');
+        }
+        div.innerHTML = '<span class="map-node-icon">' + icon + '</span>' + node.label;
+        container.appendChild(div);
+      });
+    }
+
+    // ============================================================
+    // setCurrentNode(id) — 現在地を更新してマップを再描画
+    // ============================================================
+    function setCurrentNode(id) {
+      // 前のノードを visited に追加
+      if (state.currentNode && state.visitedNodes.indexOf(state.currentNode) === -1) {
+        state.visitedNodes.push(state.currentNode);
+      }
+      state.currentNode = id;
+      renderMap();
+    }
+
+    // ============================================================
+    // markTrap(nodeId) — 罠を踏んだノードにマークを付ける
+    // ============================================================
+    function markTrap(nodeId) {
+      state.trapNodes[nodeId] = true;
+      state.mistakes++;
+      document.getElementById('hud-mistakes').textContent = state.mistakes;
+      renderMap();
+    }
+
+    // ============================================================
+    // startTimer() — HUDのタイマーを開始
+    // ============================================================
+    function startTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.startTime = new Date();
+      state.timerInterval = setInterval(function() {
+        var secs = Math.floor((new Date() - state.startTime) / 1000);
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
+        document.getElementById('hud-time').textContent =
+          m + ':' + (s < 10 ? '0' : '') + s;
+      }, 1000);
+    }
+
+    // ============================================================
+    // stopTimer() — タイマー停止して経過秒を返す
+    // ============================================================
+    function stopTimer() {
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+      if (!state.startTime) return 0;
+      return Math.floor((new Date() - state.startTime) / 1000);
+    }
+
+    // ============================================================
+    // renderEndingScore(containerId, extra) — エンディングのスコア表示
+    // mistakes: 少ないほどよい。★3/★2/★1 評価
+    // ============================================================
+    function renderEndingScore(containerId) {
+      var secs = stopTimer();
+      var m = Math.floor(secs / 60);
+      var s = secs % 60;
+      var timeStr = m + '分' + s + '秒';
+
+      // 星評価ロジック: ミス0=★3 / ミス1〜2=★2 / ミス3以上=★1
+      var stars, comment;
+      if (state.mistakes === 0) {
+        stars = '★★★';
+        comment = '完璧！一度もミスなく正解ルートを突破しました！';
+      } else if (state.mistakes <= 2) {
+        stars = '★★☆';
+        comment = 'よくできました！ヒントを活用して解決できました。';
+      } else {
+        stars = '★☆☆';
+        comment = 'もう一歩！ヒントを見返してもう一度挑戦してみましょう。';
+      }
+
+      var container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML =
+        '<div class="score-grid">' +
+          '<div class="score-item"><div class="score-val">' + state.mistakes + '</div><div class="score-lbl">ミス回数</div></div>' +
+          '<div class="score-item"><div class="score-val">' + state.hints.length + '</div><div class="score-lbl">ヒント獲得</div></div>' +
+          '<div class="score-item"><div class="score-val" style="font-size:16px;">' + timeStr + '</div><div class="score-lbl">クリアタイム</div></div>' +
+        '</div>' +
+        '<div class="star-rating">' + stars + '</div>' +
+        '<div class="rating-comment">' + comment + '</div>';
+    }
+
+    // ============================================================
+    // addJournal(title, detail) — ふりかえりジャーナルに1件追記
+    // ユーザーが実際に通った正解ステップを記録する
+    // title: 丸数字＋短い見出し / detail: 初学者向け2〜3文の解説
+    // ============================================================
+    function addJournal(title, detail) {
+      state.journal.push({ title: title, detail: detail });
+    }
+
+    // ============================================================
+    // renderJournal(containerId) — ジャーナルをエンディング画面に描画
+    // state.journal の内容を番号付きカード形式で挿入する
+    // ============================================================
+    function renderJournal(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (state.journal.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      var html = '<div class="journal-recap-heading">📖 今回行った手順の解説</div>';
+      state.journal.forEach(function(entry, idx) {
+        html +=
+          '<div class="journal-step">' +
+            '<div class="journal-step-title">' + escapeHtml(entry.title) + '</div>' +
+            '<div class="journal-step-detail">' + escapeHtml(entry.detail) + '</div>' +
+          '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    // ============================================================
+    // escapeHtml(str) — XSS防止のためHTMLエスケープ
+    // ============================================================
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ============================================================
+    // populateEndingLog(suffix) — エンディング画面にログを転記
+    // ============================================================
+    function populateEndingLog(suffix) {
+      var el = document.getElementById('log-review-' + suffix);
+      if (el) el.textContent = state.logs.join('\n');
+    }
+
+    // ============================================================
+    // shakeElement(el) — 画面シェイク演出
+    // ============================================================
+    function shakeElement(el) {
+      el.classList.add('shake');
+      setTimeout(function() { el.classList.remove('shake'); }, 600);
+    }
+
+    // ============================================================
+    // brickedAnimation() — 文鎮化演出（暗転 + グリッチ）
+    // ============================================================
+    function brickedAnimation(callback) {
+      sfxBricked();
+      var overlay = document.getElementById('overlay');
+      overlay.style.display = 'block';
+      // 少し待って暗転
+      setTimeout(function() {
+        overlay.classList.add('dim');
+        var mainContent = document.getElementById('main-content');
+        mainContent.classList.add('glitch');
+        // 2秒後に戻す
+        setTimeout(function() {
+          overlay.classList.remove('dim');
+          mainContent.classList.remove('glitch');
+          setTimeout(function() {
+            overlay.style.display = 'none';
+            if (callback) callback();
+          }, 600);
+        }, 2000);
+      }, 200);
+    }
+
+    // ============================================================
+    // resetState() — 状態リセット・スタート画面へ戻る
+    // ============================================================
     function resetState() {
+      stopTimer();
       state = {
         passwordChanged: false,
-        updateMethod: null,
-        filePicked: false,
-        logs: []
+        mistakes: 0,
+        hints: [],
+        logs: [],
+        journal: [],               // ふりかえりジャーナルもリセット
+        startTime: null,
+        currentNode: null,
+        visitedNodes: [],
+        trapNodes: {},
+        timerInterval: null,
+        audioCtx: state.audioCtx, // AudioCtxは維持
+        muted: state.muted        // ミュート状態は維持
       };
 
-      // ログ表示クリア
+      // UIリセット
       document.getElementById('log-lines').textContent = '';
-
-      // セキュリティバナー非表示
+      document.getElementById('hud-log-lines').textContent = '';
+      document.getElementById('hint-list').innerHTML = '';
+      document.getElementById('hint-empty').style.display = '';
+      document.getElementById('hud-mistakes').textContent = '0';
+      document.getElementById('hud-hints').textContent = '0';
+      document.getElementById('hud-time').textContent = '0:00';
       document.getElementById('security-banner').classList.remove('visible');
+      document.getElementById('hud-panel').classList.add('hidden');
 
-      // step4 の各エリアをリセット（再プレイ時に残骸が残らないよう）
-      resetStep4UI();
+      // 各種トラブルパネル非表示
+      document.getElementById('trouble-n4').classList.remove('visible');
+      document.getElementById('trouble-n5').classList.remove('visible');
+      document.getElementById('trouble-n6').classList.remove('visible');
+      document.getElementById('trouble-n8').classList.remove('visible');
 
-      // step6 のUIをリセット
-      resetStep6UI();
+      // N4カード表示に戻す
+      document.getElementById('n4-card-normal').style.display = '';
+      document.getElementById('n5-card-files').style.display = '';
+      document.getElementById('n6-card-normal').style.display = '';
+      document.getElementById('n6-recovery-area').style.display = 'none';
+      document.getElementById('n6-reboot-btn-area').style.display = '';
 
-      // スタート画面へ
+      // N8リセット
+      resetN8UI();
+
+      // マップクリア
+      document.getElementById('map-nodes').innerHTML = '';
+
       showScreen('start');
     }
 
-    // ========================================================
-    // resetStep4UI() — step4画面のUIをリセット
-    // ========================================================
-    function resetStep4UI() {
-      document.getElementById('method-cards').style.display = '';
-      var onlineArea = document.getElementById('online-error-area');
-      onlineArea.classList.remove('visible');
-      var onlineBar = document.getElementById('online-progress-bar');
-      onlineBar.style.width = '0%';
-      onlineBar.classList.remove('error');
-      document.getElementById('online-progress-label').textContent = '0%';
-      document.getElementById('online-error-msg').style.display = 'none';
-      document.getElementById('online-retry-btns').style.display = 'none';
-
-      var localArea = document.getElementById('local-file-area');
-      localArea.classList.remove('visible');
-      document.getElementById('file-name-display').textContent = '（未選択）';
-      document.getElementById('btn-exec-update').disabled = true;
-      state.filePicked = false;
-    }
-
-    // ========================================================
-    // resetStep6UI() — step6画面のUIをリセット
-    // ========================================================
-    function resetStep6UI() {
-      var bar = document.getElementById('update-progress-bar');
+    // ============================================================
+    // resetN8UI() — N8（更新プロセス）UIをリセット
+    // ============================================================
+    function resetN8UI() {
+      var bar = document.getElementById('n8-progress-bar');
       bar.style.width = '0%';
-      bar.classList.remove('error');
-      document.getElementById('update-progress-label').textContent = '0%';
-      document.getElementById('update-terminal-log').textContent = '$ Starting firmware update...\n';
-      document.getElementById('update-choice-area').classList.remove('visible');
-      document.getElementById('reboot-choice-area').classList.remove('visible');
-      document.getElementById('disconnect-msg').style.display = '';
-      document.getElementById('reboot-result-area').style.display = 'none';
+      bar.className = 'progress-bar';
+      document.getElementById('n8-progress-label').textContent = '0%';
+      document.getElementById('n8-terminal-log').innerHTML = '$ Starting firmware update process...<br>';
+      document.getElementById('n8-abort-area').style.display = 'none';
+      document.getElementById('trouble-n8').classList.remove('visible');
+      document.getElementById('n8-warn-msg').style.display = '';
     }
 
-    // ========================================================
-    // populateEndingLog(suffix) — エンディング画面にログを転記
-    // suffix: 'success' | 'retreat' | 'recovery' | 'bricked'
-    // ========================================================
-    function populateEndingLog(suffix) {
-      var el = document.getElementById('log-review-' + suffix);
-      if (el) {
-        el.textContent = state.logs.join('\n');
-      }
-    }
-
-    // ========================================================
+    // ============================================================
     // toggleLog() — スマホ用ログパネル折りたたみ
-    // ========================================================
+    // ============================================================
     function toggleLog() {
       var panel  = document.getElementById('log-panel');
       var toggle = document.getElementById('log-toggle');
@@ -1381,343 +2011,527 @@
       toggle.textContent = isOpen ? '▼ 操作ログを非表示' : '▶ 操作ログを表示';
     }
 
-    // ========================================================
-    // dummyMenu(e, name) — サイドバーの未使用メニュー押下時
-    // 「この課題では使いません」とログに記録して何もしない
-    // ========================================================
+    // ============================================================
+    // toggleHud() — スマホ用HUDパネル開閉
+    // ============================================================
+    function toggleHud() {
+      var hud = document.getElementById('hud-panel');
+      hud.classList.toggle('open');
+    }
+
+    // ============================================================
+    // dummyMenu(e, name) — サイドバーの未使用メニュー
+    // ============================================================
     function dummyMenu(e, name) {
       e.preventDefault();
+      sfxClick();
       addLog('> 「' + name + '」メニューはこの課題では使用しません');
     }
 
-    // ========================================================
+    // ============================================================
     // goToFirmware(e) — サイドバーの「ファームウェア更新」クリック
-    // step3にいる場合はstep4へ遷移
-    // ========================================================
+    // ============================================================
     function goToFirmware(e) {
       e.preventDefault();
+      sfxClick();
       var current = document.querySelector('.screen.active');
-      if (current && current.dataset.screen !== 'step4') {
+      if (current && current.dataset.screen !== 'n4') {
         addLog('> ファームウェア更新メニューをクリックしました');
-        showScreen('step4');
+        setCurrentNode('n4');
+        showScreen('n4');
+        // N4のトラブルパネルは非表示（戻ってきた場合）
+        document.getElementById('trouble-n4').classList.remove('visible');
+        document.getElementById('n4-card-normal').style.display = '';
       }
     }
 
-    // ========================================================
-    // step4: オンライン選択
-    // 分岐B-オンライン: プログレスが50%で通信エラーになる
-    // ========================================================
+    // ============================================================
+    // N4: オンライン選択（罠 → 通信エラー → ヒント）
+    // ============================================================
     function selectOnline() {
-      state.updateMethod = 'online';
+      sfxClick();
+      ensureAudioCtx();
       addLog('> オンライン更新を選択しました');
-      addLog('> オンライン更新を試みました');
+      markTrap('n4');
 
-      // メソッドカードを非表示にしてオンラインエラーエリアを表示
-      document.getElementById('method-cards').style.display = 'none';
-      document.getElementById('online-error-area').classList.add('visible');
+      // カード非表示、トラブルパネルへ（プログレス50%で止まる演出）
+      document.getElementById('n4-card-normal').style.display = 'none';
 
-      // プログレスバーを50%までアニメーション
-      runOnlineProgress();
+      // 短いプログレスアニメ後にトラブルパネル表示
+      setTimeout(function() {
+        sfxError();
+        shakeElement(document.getElementById('screen-n4'));
+        document.getElementById('trouble-n4').classList.add('visible');
+        addHint('メンテナンス中はオンライン更新は使えない。ローカルファイル指定を使う');
+        addLog('> ⚠️ 通信エラー: オンライン更新サーバーに接続できませんでした');
+      }, 800);
     }
 
-    // オンラインプログレスを50%まで進める→エラー表示
-    function runOnlineProgress() {
-      var bar   = document.getElementById('online-progress-bar');
-      var label = document.getElementById('online-progress-label');
-      var pct = 0;
+    // ============================================================
+    // N4: ローカル選択（正解 → N5へ）
+    // ============================================================
+    function selectLocal() {
+      sfxClick();
+      ensureAudioCtx();
+      addLog('> ローカルファイル指定を選択しました');
+      addHint('ローカルファイル指定を使う（サーバーメンテ中はオンライン不可）');
+      // ジャーナル: N4 ローカルファイル指定を選択
+      addJournal(
+        '更新方法を選択（ローカルファイル指定）',
+        'オンライン更新はサーバーから自動でファームウェアを取得できて便利ですが、今回はサーバーがメンテナンス中で利用できません。' +
+        'そのため、あらかじめメーカーサイトからダウンロードしたファイルを手動で適用する「ローカルファイル指定」を選びました。' +
+        '状況に応じて正しい更新方法を選ぶことも、作業の重要なステップです。'
+      );
+      setCurrentNode('n5');
+      showScreen('n5');
+    }
 
+    // ============================================================
+    // N5: ファイル選択（謎①型番照合）
+    // fileKey: 'correct' | 'wrong-model' | 'beta' | 'old'
+    // ============================================================
+    function selectFile(fileKey) {
+      sfxClick();
+      ensureAudioCtx();
+
+      if (fileKey === 'correct') {
+        // 正解
+        addLog('> ファイル wsr_as3200hx_jp_111.bin を選択しました（正解）');
+        addHint('型番 AS-3200HX の正式版 Ver 1.11 ファイルを選ぶ');
+        sfxSuccess();
+        // ジャーナル: N5 正解ファイルを選択
+        addJournal(
+          'ファームウェアファイルを選択（型番を照合）',
+          'ダウンロードしたファイル一覧の中から、ファイル名に含まれる型番（AS-3200HX）が自分の機種と一致しているか、またバージョンが最新版（Ver 1.11）かを確認して選びました。' +
+          '型番が異なるファームウェアを書き込むと、ルーターが起動しなくなる「文鎮化」の原因になります。' +
+          'ファイルを選ぶ前に必ずラベルで確認した型番と照合することが鉄則です。'
+        );
+        setCurrentNode('n6');
+        showScreen('n6');
+        return;
+      }
+
+      // 罠選択 → トラブルパネル表示
+      markTrap('n5');
+      sfxError();
+      shakeElement(document.getElementById('screen-n5'));
+
+      var title, msg, hint;
+      if (fileKey === 'wrong-model') {
+        title = '⚠️ 型番が一致しません';
+        msg   = '選択したファイル「wsr_as5400dx_jp_120.bin」は AS-5400DX 用です。\n' +
+                'このルーターの型番（AS-3200HX）と一致しません。誤ったファームウェアを書き込むと故障します。';
+        hint  = 'ファイル名の型番をラベルで確認した AS-3200HX と照合する';
+      } else if (fileKey === 'beta') {
+        title = '⚠️ ベータ版は不安定です';
+        msg   = '選択したファイル「as3200hx_beta_200.bin」はβ(ベータ)版です。\n' +
+                '正式リリース前のテスト版であり、動作が不安定な可能性があります。';
+        hint  = 'β(ベータ)版ではなく、正式リリース版を選ぶ';
+      } else if (fileKey === 'old') {
+        title = '⚠️ 現在と同じバージョンです';
+        msg   = '選択したファイル「as3200hx_jp_100.bin」は Ver 1.00 です。\n' +
+                'これは現在のバージョンと同じため、更新にはなりません。最新版（Ver 1.11）を選んでください。';
+        hint  = '管理画面で確認した最新版 Ver 1.11 のファイルを選ぶ';
+      }
+
+      addLog('> ⚠️ ファイル選択ミス: ' + fileKey);
+      addHint(hint);
+
+      document.getElementById('trouble-n5-title').textContent = title;
+      document.getElementById('trouble-n5-msg').textContent = msg;
+      document.getElementById('trouble-n5-hint').innerHTML = '💡 <strong>ヒント：</strong>' + hint;
+      document.getElementById('n5-card-files').style.display = 'none';
+      document.getElementById('trouble-n5').classList.add('visible');
+    }
+
+    // ============================================================
+    // N6: 接続方法選択（謎②）
+    // type: 'wired' | 'wireless'
+    // ============================================================
+    function selectConnection(type) {
+      sfxClick();
+      ensureAudioCtx();
+
+      if (type === 'wired') {
+        // 正解
+        addLog('> 有線（LANケーブル）を選択しました（正解）');
+        addHint('更新は必ず有線（LANケーブル）接続で行う');
+        sfxSuccess();
+        // ジャーナル: N6 有線接続を選択
+        addJournal(
+          '有線（LANケーブル）で接続して更新',
+          'ファームウェア更新中に通信が途切れると、書き込みが中断されてルーターが起動しなくなる恐れがあります。' +
+          '無線（Wi-Fi）は電波の状況により切断されやすいため、更新は必ず安定した有線（LANケーブル）で行うのが鉄則です。' +
+          '「安定している接続方法を選ぶ」という判断が、機器を守る重要なポイントになります。'
+        );
+        setCurrentNode('n7');
+        showScreen('n7');
+        return;
+      }
+
+      // 無線（罠）→ 更新プロセスが進んで切断される演出
+      addLog('> 無線（Wi-Fi）のまま更新を選択しました');
+      markTrap('n6');
+
+      document.getElementById('n6-card-normal').style.display = 'none';
+      document.getElementById('trouble-n6').classList.add('visible');
+
+      // 80%まで進んだ状態で止まる演出
+      var bar = document.getElementById('n6-progress-bar');
+      bar.style.width = '0%';
+      bar.className = 'progress-bar';
+
+      var pct = 0;
       var timer = setInterval(function() {
-        pct += 2;
-        if (pct >= 50) {
-          pct = 50;
+        pct += 4;
+        if (pct >= 80) {
+          pct = 80;
           clearInterval(timer);
-          // エラー表示（赤くする）
-          bar.classList.add('error');
-          label.textContent = '50% — エラー';
-          document.getElementById('online-error-msg').style.display = 'block';
-          document.getElementById('online-retry-btns').style.display = 'flex';
-          addLog('> ⚠️ 通信エラーが発生しました（50%地点）');
+          bar.className = 'progress-bar error';
+          sfxError();
+          shakeElement(document.getElementById('screen-n6'));
+          addLog('> ⚠️ 80% で通信切断（無線不安定）');
         }
         bar.style.width = pct + '%';
-        label.textContent = pct + '%';
       }, 60);
     }
 
-    // ========================================================
-    // step4: ローカル選択（またはオンラインエラーからの切り替え）
-    // ========================================================
-    function selectLocal() {
-      state.updateMethod = 'local';
-      addLog('> ローカルファイル指定を選択しました');
+    // ============================================================
+    // N6 無線トラブル: 復旧演出
+    // ============================================================
+    function doWirelessReboot() {
+      sfxClick();
+      addLog('> 緊急再起動を試みました');
+      document.getElementById('n6-reboot-btn-area').style.display = 'none';
 
-      // メソッドカードを非表示
-      document.getElementById('method-cards').style.display = 'none';
-      // オンラインエラーエリアも閉じる
-      document.getElementById('online-error-area').classList.remove('visible');
-      // ローカルファイルエリアを表示
-      document.getElementById('local-file-area').classList.add('visible');
+      setTimeout(function() {
+        // 復旧成功演出
+        document.getElementById('n6-recovery-area').style.display = 'block';
+        addHint('更新は必ず有線（LANケーブル）接続で行う。無線は切断リスクあり');
+        addLog('> 再起動後に復旧確認。有線に切り替えて再挑戦');
+        sfxSuccess();
+      }, 1500);
     }
 
-    // ========================================================
-    // step6: 更新プロセス開始
-    // 20%まで自動でプログレスを進め、その後選択肢を表示
-    // ========================================================
-    function startUpdateProcess() {
-      resetStep6UI();
-      var bar     = document.getElementById('update-progress-bar');
-      var label   = document.getElementById('update-progress-label');
-      var termLog = document.getElementById('update-terminal-log');
-      var pct = 0;
+    // ============================================================
+    // N8: 更新プロセス開始
+    // プログレスを自動進行させ、途中で「中断」ボタンを出す
+    // ============================================================
+    function startN8UpdateProcess() {
+      resetN8UI();
+      setCurrentNode('n8');
 
-      // 最初の20%まで自動進行（演出）
+      var bar     = document.getElementById('n8-progress-bar');
+      var label   = document.getElementById('n8-progress-label');
+      var termLog = document.getElementById('n8-terminal-log');
+      var pct = 0;
+      var abortShown = false;
+      var completed  = false;
+
+      // タイマーを使ってプログレスを進める（秒単位で体感できる速さ）
       var timer = setInterval(function() {
+        if (completed) return;
         pct += 1;
         bar.style.width = pct + '%';
         label.textContent = pct + '%';
 
-        // ターミナルログに進捗メッセージを追加
-        if (pct === 5)  termLog.textContent += '$ Verifying firmware signature...\n';
-        if (pct === 10) termLog.textContent += '$ Erasing flash memory...\n';
-        if (pct === 20) {
-          termLog.textContent += '$ Writing firmware data... [■■■■□□□□□□□□] 20%\n';
-          clearInterval(timer);
-          // 選択肢ボタンを表示（学習用: どの体験をするかユーザーが選ぶ）
-          document.getElementById('update-choice-area').classList.add('visible');
+        // ログメッセージ
+        if (pct === 5)  appendTermLog(termLog, '$ Verifying firmware signature... OK');
+        if (pct === 10) appendTermLog(termLog, '$ Erasing flash memory...');
+        if (pct === 20) appendTermLog(termLog, '$ Writing firmware data... [■■□□□□□□□□] 20%');
+        if (pct === 40) appendTermLog(termLog, '$ Writing firmware data... [■■■■□□□□□□] 40%');
+        if (pct === 60) appendTermLog(termLog, '$ Writing firmware data... [■■■■■■□□□□] 60%');
+        if (pct === 80) appendTermLog(termLog, '$ Writing firmware data... [■■■■■■■■□□] 80%');
+
+        // 30%から「中断」ボタンを表示（誘惑ボタン）
+        if (pct === 30 && !abortShown) {
+          abortShown = true;
+          document.getElementById('n8-abort-area').style.display = 'block';
         }
-        termLog.scrollTop = termLog.scrollHeight;
-      }, 80);
-    }
 
-    // ========================================================
-    // step6: 通常完了ルート（分岐D: 成功エンディングへ）
-    // プログレスバーが100%まで到達してエンディング1へ
-    // ========================================================
-    function doNormalComplete() {
-      document.getElementById('update-choice-area').classList.remove('visible');
-      var bar     = document.getElementById('update-progress-bar');
-      var label   = document.getElementById('update-progress-label');
-      var termLog = document.getElementById('update-terminal-log');
-      var pct = parseInt(bar.style.width) || 20;
+        if (pct === 95) appendTermLog(termLog, '$ Finalizing... verifying checksum...');
 
-      var timer = setInterval(function() {
-        pct += 2;
-        bar.style.width = pct + '%';
-        label.textContent = pct + '%';
-
-        if (pct === 40) termLog.textContent += '$ Writing firmware data... [■■■■■■■■□□□□] 40%\n';
-        if (pct === 60) termLog.textContent += '$ Writing firmware data... [■■■■■■■■■■□□] 60%\n';
-        if (pct === 80) termLog.textContent += '$ Writing firmware data... [■■■■■■■■■■■■] 80%\n';
-        if (pct === 95) termLog.textContent += '$ Finalizing... verifying checksum...\n';
-
+        // 100%完了
         if (pct >= 100) {
           pct = 100;
+          completed = true;
           clearInterval(timer);
-          bar.style.width = '100%';
+          bar.className = 'progress-bar success';
           label.textContent = '100% — 完了';
-          termLog.textContent += '$ Update complete. Rebooting...\n$ Firmware version: 1.11\n';
-          addLog('> 更新が正常に完了しました');
+          appendTermLog(termLog, '$ Update complete. Rebooting...');
+          appendTermLog(termLog, '$ Firmware version: 1.11');
+          document.getElementById('n8-abort-area').style.display = 'none';
+          addLog('> ファームウェア更新が正常に完了しました（Ver 1.11）');
+          sfxSuccess();
+          // ジャーナル: N8 更新完了
+          addJournal(
+            'ファームウェアの書き込みが完了',
+            '選んだファームウェアファイルの内容をルーター内部のフラッシュメモリに書き込む工程が完了しました。' +
+            'この間に電源を切ったり画面を閉じたりすると、書き込みが中断されてルーターが起動しなくなる「文鎮化」が発生します。' +
+            '完了のメッセージが表示されるまで、絶対に操作せず待ち続けることが重要です。'
+          );
 
-          // 少し待ってエンディングへ
+          // 1秒後にエンディングへ
           setTimeout(function() {
-            populateEndingLog('success');
-            showScreen('ending-success');
-            // 成功エンディング: passwordChanged=true なら警告バナーを非表示に
-            if (state.passwordChanged) {
-              document.getElementById('security-banner').classList.remove('visible');
-            }
-          }, 800);
+            doSuccessEnding();
+          }, 1000);
         }
-        termLog.scrollTop = termLog.scrollHeight;
-      }, 80);
+      }, 120); // 約12秒で100%
+
+      // N8 の timer参照を保持（中断ボタン押下でクリア）
+      state._n8Timer = timer;
+      state._n8Completed = function() { return completed; };
+      state._n8StopTimer = function() {
+        completed = true;
+        clearInterval(timer);
+      };
     }
 
-    // ========================================================
-    // step6: 中断トラブルルート（分岐D: 80%で停止）
-    // ========================================================
-    function doTroubleSimulate() {
-      document.getElementById('update-choice-area').classList.remove('visible');
-      var bar     = document.getElementById('update-progress-bar');
-      var label   = document.getElementById('update-progress-label');
-      var termLog = document.getElementById('update-terminal-log');
-      var pct = parseInt(bar.style.width) || 20;
-
-      var timer = setInterval(function() {
-        pct += 2;
-        bar.style.width = pct + '%';
-        label.textContent = pct + '%';
-
-        if (pct === 40) termLog.textContent += '$ Writing firmware data... [■■■■■■■■□□□□] 40%\n';
-        if (pct === 60) termLog.textContent += '$ Writing firmware data... [■■■■■■■■■■□□] 60%\n';
-
-        if (pct >= 80) {
-          pct = 80;
-          clearInterval(timer);
-          bar.classList.add('error');
-          bar.style.width = '80%';
-          label.textContent = '80% — 中断';
-          termLog.textContent += '$ ERROR: Connection lost. Write process interrupted at 80%.\n$ *** DO NOT POWER OFF ***\n';
-          addLog('> 更新中に通信が切断されました（80%地点）');
-
-          // 再起動選択を表示
-          document.getElementById('reboot-choice-area').classList.add('visible');
-        }
-        termLog.scrollTop = termLog.scrollHeight;
-      }, 80);
+    // ターミナルログに1行追加
+    function appendTermLog(el, text) {
+      el.innerHTML += text + '<br>';
+      el.scrollTop = el.scrollHeight;
     }
 
-    // ========================================================
-    // step6: 再起動試行
-    // 再起動後の結果選択(復旧 or 文鎮化)を提示
-    // ========================================================
-    function doReboot() {
-      var termLog = document.getElementById('update-terminal-log');
-      termLog.textContent += '$ Attempting emergency reboot...\n$ ...\n$ ...\n';
-      addLog('> 再起動を試みました');
-      document.getElementById('disconnect-msg').style.display = 'none';
-      document.getElementById('btn-reboot').style.display = 'none';
+    // ============================================================
+    // N8: 中断ボタン → 文鎮化イベント
+    // ============================================================
+    function doAbortUpdate() {
+      sfxClick();
+      // 進行中のタイマーを止める
+      if (state._n8StopTimer) state._n8StopTimer();
 
-      setTimeout(function() {
-        termLog.textContent += '$ Reboot signal sent...\n';
-        document.getElementById('reboot-result-area').style.display = 'block';
-        termLog.scrollTop = termLog.scrollHeight;
-      }, 1000);
+      addLog('> ⚠️ 更新を中断しました（文鎮化トラブル発生）');
+      markTrap('n8');
+      sfxBricked();
+
+      // 文鎮化演出
+      brickedAnimation(function() {
+        // 演出後: トラブルパネル表示
+        var bar = document.getElementById('n8-progress-bar');
+        bar.className = 'progress-bar error';
+        document.getElementById('n8-abort-area').style.display = 'none';
+        document.getElementById('trouble-n8').classList.add('visible');
+        addHint('更新中の中断・電源断は文鎮化の原因。完了まで絶対に触らない！');
+        addLog('> 緊急初期化処理により Ver 1.00 に戻しました。再挑戦してください。');
+      });
     }
 
-    // ========================================================
-    // ボタンのイベント配線
-    // DOMContentLoaded 後に全ボタンを addEventListener で接続する
-    // ========================================================
+    // ============================================================
+    // 成功エンディングへ遷移（passwordChangedで分岐）
+    // ============================================================
+    function doSuccessEnding() {
+      stopTimer();
+      // パスワード変更済みかどうかで完全成功 or セキュリティ要改善に分岐
+      if (state.passwordChanged) {
+        // 完全成功
+        document.getElementById('security-banner').classList.remove('visible');
+        renderEndingScore('ending-score-success');
+        populateEndingLog('success');
+        renderJournal('journal-recap-success');
+        showScreen('ending-success');
+      } else {
+        // セキュリティ要改善（バナー残存）
+        renderEndingScore('ending-score-insecure');
+        populateEndingLog('success-insecure');
+        renderJournal('journal-recap-insecure');
+        showScreen('ending-success-insecure');
+      }
+    }
+
+    // ============================================================
+    // DOMContentLoaded: ボタン配線
+    // ============================================================
     document.addEventListener('DOMContentLoaded', function() {
+
+      // ---- ミュートボタン ----
+      document.getElementById('btn-mute').addEventListener('click', function() {
+        ensureAudioCtx();
+        toggleMute();
+      });
 
       // ---- スタート画面 ----
       document.getElementById('btn-start').addEventListener('click', function() {
+        ensureAudioCtx();
+        sfxClick();
         addLog('> シミュレーションを開始しました');
-        showScreen('step1');
+        startTimer();
+        setCurrentNode('n1');
+        showScreen('n1');
       });
 
-      // ---- step1: ラベル確認ボタン ----
-      document.getElementById('btn-label-confirmed').addEventListener('click', function() {
-        addLog('> ルーターのラベルを確認しました');
-        showScreen('step2');
+      // ---- N1: ラベル確認 ----
+      document.getElementById('btn-n1-confirmed').addEventListener('click', function() {
+        sfxClick();
+        addLog('> ルーターのラベルを確認しました（型番: AS-3200HX）');
+        addHint('型番は AS-3200HX。ファイル選択時に照合する');
+        // ジャーナル: N1 ラベル確認
+        addJournal(
+          'ルーター本体のラベルを確認',
+          'ルーター底面のラベルには型番（AS-3200HX）・管理画面のURL（192.168.1.1）・初期パスワードが記載されています。' +
+          '更新作業は「自分の機種が何か」「どこにアクセスするか」を把握することから始まります。' +
+          'ラベルの型番は、後でファームウェアファイルを選ぶときに照合する重要な情報です。'
+        );
+        setCurrentNode('n2');
+        showScreen('n2');
       });
 
-      // ---- step2: ログインボタン（分岐A） ----
+      // ---- N2: ログインボタン（パスワード分岐） ----
       document.getElementById('btn-login').addEventListener('click', function() {
+        sfxClick();
         var pw = document.getElementById('input-password').value;
-        // admin または空欄の場合 → 初期PW使用
         if (pw === '' || pw === 'admin') {
           state.passwordChanged = false;
           addLog('> 初期パスワードのままログインしました');
           addLog('> ⚠️ セキュリティ警告が表示されました');
+          // ヒントを追加するが行き止まりにはしない（減点のみ）
+          addHint('初期パスワードは変更すべき（N2でパスワード変更済みログインが推奨）');
           updateSecurityBanner();
+          // ジャーナル: N2 初期パスワードのままログイン
+          addJournal(
+            '管理画面にログイン（初期パスワードのまま）',
+            '管理画面はルーターの設定を変更するための入口です。' +
+            '初期パスワード（admin）のままで使い続けると、第三者に乗っ取られる危険があります。' +
+            '実際に、初期パスワードが変更されていないIoT機器が攻撃に悪用された事例（Mirai等）が多数報告されています。最初にパスワードを変更することが正しい手順です。'
+          );
         } else {
-          // 別のPW → パスワード変更済みとみなす
           state.passwordChanged = true;
-          addLog('> パスワードを変更してログインしました');
+          addLog('> パスワードを変更してログインしました（セキュリティ改善）');
           updateSecurityBanner();
+          sfxSuccess();
+          // ジャーナル: N2 パスワード変更してログイン
+          addJournal(
+            '管理画面にログイン（パスワードを変更）',
+            '管理画面はルーターの設定を変更するための入口です。' +
+            '初期パスワードのままだと第三者に乗っ取られるリスクがあるため、最初に変更するのが正しい手順です。' +
+            'パスワードを変更することでセキュリティバナーが消え、安全な状態でファームウェア更新を進められます。'
+          );
         }
-        showScreen('step3');
+        setCurrentNode('n3');
+        showScreen('n3');
       });
 
-      // ---- step2: 初期設定のまま進めるボタン（分岐A: 必ず警告） ----
+      // ---- N2: 初期設定のまま進めるボタン ----
       document.getElementById('btn-login-default').addEventListener('click', function() {
+        sfxClick();
         state.passwordChanged = false;
-        addLog('> 初期パスワードのままログインしました');
+        addLog('> 初期設定のままログインしました（passwordChanged=false）');
         addLog('> ⚠️ セキュリティ警告が表示されました');
+        addHint('初期パスワードは変更すべき（N2でパスワード変更済みログインが推奨）');
         updateSecurityBanner();
-        showScreen('step3');
+        // ジャーナル: N2 初期設定のままログイン
+        addJournal(
+          '管理画面にログイン（初期パスワードのまま）',
+          '管理画面はルーターの設定を変更するための入口です。' +
+          '初期パスワード（admin）のままで使い続けると、第三者に乗っ取られる危険があります。' +
+          '実際に、初期パスワードが変更されていないIoT機器が攻撃に悪用された事例（Mirai等）が多数報告されています。最初にパスワードを変更することが正しい手順です。'
+        );
+        setCurrentNode('n3');
+        showScreen('n3');
       });
 
-      // ---- step3: ファームウェア更新ボタン ----
+      // ---- N3: ファームウェア更新ボタン ----
       document.getElementById('btn-go-fw').addEventListener('click', function() {
+        sfxClick();
         addLog('> ファームウェア更新画面に移動しました');
-        showScreen('step4');
+        addHint('現在バージョン Ver 1.00 / 新バージョン Ver 1.11 が利用可能');
+        // ジャーナル: N3 バージョン確認
+        addJournal(
+          '現在のファームウェアバージョンを確認',
+          '管理トップ画面で現在のバージョン（Ver 1.00）と最新版（Ver 1.11）を見比べ、更新が必要かどうかを確認しました。' +
+          'また、画面の隅に「オンライン更新サーバーはメンテナンス中」という告知があり、これが次の更新方法の選択に影響します。' +
+          '小さな通知を見落とさないことが、実際の作業でも重要なポイントです。'
+        );
+        // N4トラブルパネルを初期化してから遷移
+        document.getElementById('trouble-n4').classList.remove('visible');
+        document.getElementById('n4-card-normal').style.display = '';
+        setCurrentNode('n4');
+        showScreen('n4');
       });
 
-      // ---- step4: オンラインリトライボタン（また50%で失敗） ----
-      document.getElementById('btn-online-retry').addEventListener('click', function() {
-        addLog('> オンライン更新を再試行しました');
-        // プログレスをリセットして再度失敗
-        var bar = document.getElementById('online-progress-bar');
-        bar.style.width = '0%';
-        bar.classList.remove('error');
-        document.getElementById('online-progress-label').textContent = '0%';
-        document.getElementById('online-error-msg').style.display = 'none';
-        document.getElementById('online-retry-btns').style.display = 'none';
-        addLog('> オンライン更新を試みました');
-        runOnlineProgress();
+      // ---- N4: オンライントラブル「戻る」ボタン ----
+      document.getElementById('btn-n4-back-from-trouble').addEventListener('click', function() {
+        sfxClick();
+        document.getElementById('trouble-n4').classList.remove('visible');
+        document.getElementById('n4-card-normal').style.display = '';
+        addLog('> N4 に戻りました（やり直し）');
       });
 
-      // ---- step4: ローカルに切り替えボタン（オンラインエラーから） ----
-      document.getElementById('btn-switch-local').addEventListener('click', function() {
-        addLog('> ローカルファイル指定に切り替えました');
-        selectLocal();
+      // ---- N5: ファイル選択トラブル「戻る」ボタン ----
+      document.getElementById('btn-n5-back').addEventListener('click', function() {
+        sfxClick();
+        document.getElementById('trouble-n5').classList.remove('visible');
+        document.getElementById('n5-card-files').style.display = '';
+        addLog('> ファイル選択に戻りました（やり直し）');
       });
 
-      // ---- step4: ダミーファイル選択ボタン ----
-      document.getElementById('btn-pick-file').addEventListener('click', function() {
-        // 実際のファイル選択は不要。ファイル名を自動入力する
-        document.getElementById('file-name-display').textContent = 'wsr_xxxx_jp_111.bin';
-        state.filePicked = true;
-        document.getElementById('btn-exec-update').disabled = false;
-        addLog('> ローカルファイル(wsr_xxxx_jp_111.bin)を指定しました');
+      // ---- N6: 無線トラブル「緊急再起動」ボタン ----
+      document.getElementById('btn-n6-reboot').addEventListener('click', function() {
+        doWirelessReboot();
       });
 
-      // ---- step4: 更新実行ボタン → step5 ----
-      document.getElementById('btn-exec-update').addEventListener('click', function() {
-        if (!state.filePicked) return; // 念のため二重チェック
-        showScreen('step5');
+      // ---- N6: 無線トラブル「有線に切り替えて再挑戦」ボタン ----
+      document.getElementById('btn-n6-retry').addEventListener('click', function() {
+        sfxClick();
+        document.getElementById('trouble-n6').classList.remove('visible');
+        document.getElementById('n6-card-normal').style.display = '';
+        document.getElementById('n6-recovery-area').style.display = 'none';
+        document.getElementById('n6-reboot-btn-area').style.display = '';
+        addLog('> N6 に戻りました（有線で再挑戦）');
       });
 
-      // ---- step5: 実行する（分岐C: step6へ） ----
-      document.getElementById('btn-execute').addEventListener('click', function() {
+      // ---- N7: 実行するボタン → N8 ----
+      document.getElementById('btn-n7-execute').addEventListener('click', function() {
+        sfxClick();
         addLog('> 更新を実行しました');
-        showScreen('step6');
-        startUpdateProcess();
+        // ジャーナル: N7 実行
+        addJournal(
+          '更新内容を最終確認して実行',
+          '更新前に「電源を切らないでください」などの注意事項を読み、更新内容（Ver 1.00 → Ver 1.11）を確認してから実行しました。' +
+          'この最終確認は、誤って別の操作をしてしまわないための重要なステップです。' +
+          '「本当に実行していいか」を一呼吸置いて確認する習慣が、実際の作業ミスを防ぎます。'
+        );
+        showScreen('n8');
+        startN8UpdateProcess();
       });
 
-      // ---- step5: キャンセル（分岐C: 撤退エンディングへ） ----
-      document.getElementById('btn-cancel').addEventListener('click', function() {
-        addLog('> 更新をキャンセルし、撤退しました');
+      // ---- N7: キャンセル → 撤退エンディング ----
+      document.getElementById('btn-n7-cancel').addEventListener('click', function() {
+        sfxClick();
+        addLog('> 更新をキャンセルしました（撤退）');
+        // ジャーナル: N7 キャンセル（撤退）
+        addJournal(
+          '更新をキャンセル（撤退）',
+          '最終確認の場面で更新を中止しました。不安が残るときに無理に進めず立ち止まることは、実際の作業でも正しい判断です。' +
+          '「わからないまま実行しない」という選択が、取り返しのつかないトラブルを防ぎます。' +
+          'どこで・なぜやめたかを記録しておくと、次に再挑戦するときや他の人に引き継ぐときに役立ちます。'
+        );
+        stopTimer();
+        renderEndingScore('ending-score-retreat');
         populateEndingLog('retreat');
+        renderJournal('journal-recap-retreat');
         showScreen('ending-retreat');
-        // 撤退でもバナーはそのまま（state.passwordChanged の状態を維持）
       });
 
-      // ---- step6: 通常完了ボタン（分岐D） ----
-      document.getElementById('btn-normal-complete').addEventListener('click', function() {
-        doNormalComplete();
+      // ---- N8: 中断ボタン（誘惑ボタン）→ 文鎮化 ----
+      document.getElementById('btn-abort-update').addEventListener('click', function() {
+        doAbortUpdate();
       });
 
-      // ---- step6: 中断トラブルを体験するボタン（分岐D） ----
-      document.getElementById('btn-trouble-simulate').addEventListener('click', function() {
-        doTroubleSimulate();
+      // ---- N8: 文鎮化トラブル「もう一度 N8 から挑戦」ボタン ----
+      document.getElementById('btn-n8-retry').addEventListener('click', function() {
+        sfxClick();
+        addLog('> N8 から再挑戦します');
+        showScreen('n8');
+        startN8UpdateProcess();
       });
 
-      // ---- step6: 再起動ボタン ----
-      document.getElementById('btn-reboot').addEventListener('click', function() {
-        doReboot();
-      });
-
-      // ---- step6: 復旧選択（エンディング3へ） ----
-      document.getElementById('btn-recovery').addEventListener('click', function() {
-        addLog('> 再起動後に復旧を確認しました');
-        populateEndingLog('recovery');
-        showScreen('ending-recovery');
-      });
-
-      // ---- step6: 文鎮化選択（エンディング4へ） ----
-      document.getElementById('btn-bricked').addEventListener('click', function() {
-        addLog('> ルーターが応答しなくなりました（文鎮化）');
-        populateEndingLog('bricked');
-        showScreen('ending-bricked');
-      });
-
-      // ---- エンディング各: もう一度シミュレーションするボタン ----
-      ['success', 'retreat', 'recovery', 'bricked'].forEach(function(key) {
+      // ---- エンディング: もう一度シミュレーションするボタン ----
+      ['success', 'insecure', 'retreat'].forEach(function(key) {
         var btn = document.getElementById('btn-restart-' + key);
         if (btn) {
           btn.addEventListener('click', function() {
+            sfxClick();
             resetState();
           });
         }
@@ -1741,7 +2555,13 @@
         sidebarOverlay.classList.remove('visible');
         sidebarToggle.textContent = '☰';
       });
-    });
+
+      // ========================================================
+      // 初期マップ描画（スタート前の空状態）
+      // ========================================================
+      renderMap();
+
+    }); // DOMContentLoaded
   </script>
 </body>
 </html>
