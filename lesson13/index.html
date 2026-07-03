@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>METADOR FILE — 消えた標的の正体を追え</title>
+
+<!-- Google Fonts: 英字タイプライター体 + 日本語手書き風 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Yomogi&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================
+   METADOR FILE — デザイントークン & 共有CSS (SHELL担当)
+   他ステージのHTML/CSSはここで定義したクラス・変数を前提にできる
+   ========================================================== */
+:root{
+  --bg: #0d0d0f;           /* 背景 */
+  --paper: #e8e2d0;        /* 紙(セピア) */
+  --ink: #1c1a16;          /* 紙上の文字 */
+  --thread: #c0392b;       /* 赤い糸・アクセント */
+  --thread-wrong: #6b6b6b; /* 誤った糸 */
+  --stamp: #a93226;        /* スタンプ赤 */
+  --dim: #8a8578;          /* 薄い文字 */
+  --cork: #4a3728;         /* コルクボード茶 */
+
+  --font-en: 'Special Elite', monospace;
+  --font-jp: 'Yomogi', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+}
+
+/* ---------- ベースリセット ---------- */
+*, *::before, *::after{ box-sizing:border-box; }
+html, body{ margin:0; padding:0; }
+body{
+  min-height:100vh;
+  background-color:var(--bg);
+  color:var(--paper);
+  font-family:var(--font-jp);
+  line-height:1.7;
+  position:relative;
+  overflow-x:hidden;
+  /* かすかなノイズ + ビネット(データURIのみ・外部通信なし) */
+  background-image:
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.65) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  background-attachment:fixed;
+  background-size:cover, 200px 200px;
+}
+a{ color:inherit; }
+button{ font:inherit; }
+img{ max-width:100%; display:block; }
+
+/* フラッシュ演出用のオーバーレイ(body::afterに常設し、.flash時のみ発火) */
+body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  background:var(--stamp);
+  opacity:0;
+  pointer-events:none;
+  z-index:9999;
+}
+body.flash::after{
+  animation:flashPulse .4s ease-out;
+}
+@keyframes flashPulse{
+  0%{ opacity:.75; }
+  100%{ opacity:0; }
+}
+
+/* ---------- header ---------- */
+header{
+  padding:2rem 1rem 1.25rem;
+  text-align:center;
+  border-bottom:1px solid rgba(232,226,208,0.12);
+  background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0));
+}
+header h1{
+  margin:0;
+  font-family:var(--font-en);
+  font-size:2.1rem;
+  letter-spacing:0.35em;
+  text-indent:0.35em; /* letter-spacingで右にずれる分を補正 */
+  color:var(--paper);
+  text-shadow:0 0 12px rgba(192,57,43,0.35), 0 2px 0 #000;
+}
+header .subtitle{
+  margin:0.5rem 0 0;
+  font-family:var(--font-jp);
+  font-size:0.95rem;
+  color:var(--dim);
+  letter-spacing:0.08em;
+}
+
+/* ---------- 進行状況バー #progress ---------- */
+#progress{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:0.5rem;
+  flex-wrap:wrap;
+  margin-top:1.1rem;
+}
+#progress .progress-step{
+  font-family:var(--font-en);
+  font-size:0.65rem;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  padding:0.35em 0.7em;
+  border:1px solid rgba(138,133,120,0.5);
+  border-radius:2px;
+  color:var(--dim);
+  background:rgba(0,0,0,0.2);
+  transition:all .35s ease;
+}
+#progress .progress-step.current{
+  color:#fff;
+  border-color:var(--thread);
+  background:var(--thread);
+  box-shadow:0 0 10px rgba(192,57,43,0.65);
+  animation:pulseGlow 1.6s ease-in-out infinite;
+}
+#progress .progress-step.done{
+  color:var(--thread);
+  border-color:var(--thread);
+  background:rgba(192,57,43,0.08);
+}
+#progress .progress-step.done::before{
+  content:"✓ ";
+}
+@keyframes pulseGlow{
+  0%,100%{ box-shadow:0 0 6px rgba(192,57,43,0.5); }
+  50%{ box-shadow:0 0 16px rgba(192,57,43,0.9); }
+}
+
+/* ---------- main / stage ---------- */
+main#app{
+  max-width:900px;
+  margin:0 auto;
+  padding:1.75rem 1rem 3rem;
+  min-height:60vh;
+}
+
+/* .stage: 非表示がデフォルト。.active が付いたものだけ表示してフェードイン */
+.stage{
+  display:none;
+}
+.stage.active{
+  display:block;
+  animation:stageFadeIn .55s ease;
+}
+@keyframes stageFadeIn{
+  from{ opacity:0; transform:translateY(10px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+/* ---------- .paper: セピア紙カード ---------- */
+.paper{
+  background:var(--paper);
+  color:var(--ink);
+  padding:1.25rem 1.4rem;
+  border-radius:2px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.15) inset;
+  font-family:var(--font-jp);
+}
+.paper h2, .paper h3{
+  font-family:var(--font-en);
+  margin-top:0;
+}
+
+/* ---------- .btn: 基本ボタン ---------- */
+.btn{
+  display:inline-block;
+  font-family:var(--font-en);
+  letter-spacing:0.05em;
+  background:transparent;
+  color:var(--paper);
+  border:2px solid var(--paper);
+  padding:0.55em 1.1em;
+  cursor:pointer;
+  border-radius:2px;
+  transition:background .2s ease, color .2s ease, transform .1s ease;
+}
+.btn:hover{
+  background:var(--paper);
+  color:var(--ink);
+}
+.btn:active{
+  transform:scale(0.97);
+}
+.btn:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
+}
+
+/* ---------- .btn-next: 大きめの NEXT ボタン ---------- */
+.btn-next{
+  display:block;
+  margin:1.75rem auto 0;
+  font-family:var(--font-en);
+  font-size:1.05rem;
+  letter-spacing:0.12em;
+  background:var(--thread);
+  color:#fff;
+  border:2px solid var(--thread);
+  padding:0.8em 2.2em;
+  cursor:pointer;
+  border-radius:2px;
+  box-shadow:0 0 16px rgba(192,57,43,0.55);
+  animation:nextAppear .4s ease;
+}
+.btn-next:hover{
+  background:#fff;
+  color:var(--thread);
+}
+@keyframes nextAppear{
+  from{ opacity:0; transform:translateY(8px) scale(0.96); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* ---------- .modal-overlay ---------- */
+.modal-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.85);
+  z-index:1000;
+  align-items:center;
+  justify-content:center;
+  padding:1rem;
+}
+.modal-overlay.open{
+  display:flex;
+}
+
+/* ---------- .stamp: 赤い斜めスタンプ ---------- */
+.stamp{
+  display:inline-block;
+  font-family:var(--font-en);
+  text-transform:uppercase;
+  letter-spacing:0.15em;
+  color:var(--stamp);
+  border:3px double var(--stamp);
+  padding:0.2em 0.55em;
+  transform:rotate(-9deg);
+  opacity:0.88;
+  mix-blend-mode:multiply;
+}
+
+/* ---------- .typewriter ---------- */
+.typewriter{
+  white-space:pre-wrap;
+  font-family:var(--font-jp);
+}
+.typewriter::after{
+  content:"▌";
+  margin-left:2px;
+  animation:blinkCursor 1s step-start infinite;
+  color:var(--thread);
+}
+
+@keyframes blinkCursor{
+  50%{ opacity:0; }
+}
+
+/* ---------- footer ---------- */
+footer{
+  text-align:center;
+  padding:1.5rem 1rem 2.5rem;
+  font-size:0.75rem;
+  color:var(--dim);
+  letter-spacing:0.04em;
+  border-top:1px solid rgba(232,226,208,0.1);
+}
+
+/* ---------- モバイル対応(375px想定) ---------- */
+@media (max-width:480px){
+  header{ padding:1.4rem 0.75rem 1rem; }
+  header h1{ font-size:1.35rem; letter-spacing:0.22em; text-indent:0.22em; }
+  header .subtitle{ font-size:0.8rem; }
+  #progress .progress-step{ font-size:0.58rem; padding:0.3em 0.5em; }
+  main#app{ padding:1.25rem 0.65rem 2.25rem; }
+  .paper{ padding:1rem; }
+  .btn-next{ width:100%; font-size:0.95rem; padding:0.75em 1em; }
+}
+
+/* ---------- .hint-box / .hint-btn / .hint-line: 段階式ヒント(共通) ---------- */
+.hint-box{
+  margin-top:1rem;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.6rem;
+}
+.hint-btn{
+  font-size:.85rem;
+  padding:.45em .9em;
+  opacity:.85;
+}
+.hint-btn:disabled{
+  opacity:.35;
+}
+/* 紙(.paper)の上に置かれたヒントボタンは赤スタンプ調にして視認性を確保 */
+.paper .hint-btn{
+  color:var(--stamp);
+  border-color:var(--stamp);
+  opacity:1;
+}
+.paper .hint-btn:hover{
+  background:var(--stamp);
+  color:var(--paper);
+}
+.paper .hint-btn:disabled{
+  opacity:.45;
+  background:transparent;
+  color:var(--stamp);
+}
+.hint-area{
+  width:100%;
+  max-width:520px;
+  display:flex;
+  flex-direction:column;
+  gap:.5rem;
+}
+.hint-line{
+  font-family:var(--font-jp);
+  background:var(--paper);
+  color:var(--ink);
+  border-left:4px solid var(--thread);
+  padding:.7em .9em;
+  font-size:.88rem;
+  line-height:1.6;
+  border-radius:2px;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+  transform:rotate(-0.3deg);
+  animation:hintFadeIn .35s ease;
+}
+@keyframes hintFadeIn{
+  0%{ opacity:0; transform:translateY(6px) rotate(-0.3deg); }
+  100%{ opacity:1; transform:translateY(0) rotate(-0.3deg); }
+}
+/* ヒントエリアのスマホ対応(既存の @media (max-width:480px) とは別ブロックとして追加) */
+@media (max-width:480px){
+  .hint-area{ max-width:100%; }
+  .hint-line{ font-size:.82rem; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>METADOR FILE</h1>
+  <p class="subtitle">消えた標的の正体を追え</p>
+  <div id="progress">
+    <div class="progress-step" data-stage="0">STAGE 0</div>
+    <div class="progress-step" data-stage="1">STAGE 1</div>
+    <div class="progress-step" data-stage="2">STAGE 2</div>
+    <div class="progress-step" data-stage="3">STAGE 3</div>
+    <div class="progress-step" data-stage="4">STAGE 4</div>
+  </div>
+</header>
+
+<main id="app">
+<section class="stage" id="stage-0">
+  <style>
+    /* ===== STAGE0: ロック画面 専用スタイル (プレフィックス s0-) ===== */
+    #stage-0 .s0-container{
+      max-width:640px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:24px;
+    }
+    #stage-0 .s0-file{
+      position:relative;
+      width:220px;
+      height:160px;
+      background:linear-gradient(160deg,var(--paper),#d8d0b8);
+      border:2px solid var(--ink);
+      border-radius:4px;
+      box-shadow:0 10px 25px rgba(0,0,0,.5);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    #stage-0 .s0-stamp-restricted{
+      position:absolute;
+      top:8px;
+      left:50%;
+      transform:translateX(-50%) rotate(-6deg);
+      color:var(--stamp);
+      border:3px solid var(--stamp);
+      padding:4px 8px;
+      font-family:'Special Elite', monospace;
+      font-size:.62rem;
+      letter-spacing:1px;
+      text-align:center;
+      line-height:1.3;
+      opacity:.85;
+    }
+    /* 南京錠アイコン(CSSのみで表現) */
+    #stage-0 .s0-lock{
+      position:relative;
+      width:70px;
+      height:70px;
+    }
+    #stage-0 .s0-lock-shackle{
+      position:absolute;
+      left:50%;
+      top:0;
+      width:36px;
+      height:34px;
+      margin-left:-18px;
+      border:7px solid #2b2b2b;
+      border-bottom:none;
+      border-radius:18px 18px 0 0;
+      transform-origin:8px 30px;
+      transition:transform .6s ease;
+    }
+    #stage-0 .s0-lock-body{
+      position:absolute;
+      left:50%;
+      bottom:0;
+      width:64px;
+      height:42px;
+      margin-left:-32px;
+      background:#3a3a3a;
+      border-radius:6px;
+      box-shadow:inset 0 -4px 6px rgba(0,0,0,.4);
+    }
+    #stage-0 .s0-lock-body::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      top:10px;
+      width:8px;
+      height:16px;
+      margin-left:-4px;
+      background:#111;
+      border-radius:2px;
+    }
+    /* 解錠アニメーション: シャックルが跳ね上がって開く */
+    #stage-0 .s0-lock.s0-unlocking .s0-lock-shackle{
+      transform:rotate(-55deg) translateY(-6px);
+    }
+    #stage-0 .s0-lock.s0-unlocking .s0-lock-body{
+      animation:s0-body-pop .5s ease;
+    }
+    @keyframes s0-body-pop{
+      0%{ transform:translateY(0); }
+      40%{ transform:translateY(3px); }
+      100%{ transform:translateY(0); }
+    }
+    #stage-0 .s0-briefing{
+      padding:20px 22px;
+      width:100%;
+      min-height:110px;
+      transform:rotate(-0.4deg);
+    }
+    #stage-0 .s0-briefing p{
+      font-family:'Yomogi', sans-serif;
+      line-height:1.9;
+      font-size:1rem;
+      white-space:pre-wrap;
+    }
+    #stage-0 .s0-input-row{
+      display:flex;
+      gap:10px;
+      width:100%;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    #stage-0 .s0-password-input{
+      flex:1 1 220px;
+      min-width:180px;
+      padding:12px 14px;
+      background:var(--paper);
+      color:var(--ink);
+      border:2px solid var(--ink);
+      font-family:'Special Elite', monospace;
+      font-size:1.1rem;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      border-radius:2px;
+    }
+    #stage-0 .s0-input-row.s0-shake{
+      animation:s0-shake .45s;
+    }
+    @keyframes s0-shake{
+      0%,100%{ transform:translateX(0); }
+      20%{ transform:translateX(-10px); }
+      40%{ transform:translateX(10px); }
+      60%{ transform:translateX(-6px); }
+      80%{ transform:translateX(6px); }
+    }
+    #stage-0 .s0-feedback{
+      min-height:22px;
+      color:var(--thread);
+      font-family:'Special Elite', monospace;
+      font-size:.9rem;
+      text-align:center;
+    }
+    #stage-0 .s0-feedback.s0-ok{
+      color:#3f8f5c;
+    }
+    @media (max-width:480px){
+      #stage-0 .s0-file{ width:180px; height:140px; }
+      #stage-0 .s0-briefing{ padding:16px; }
+      #stage-0 .s0-briefing p{ font-size:.92rem; }
+    }
+  </style>
+
+  <div class="s0-container">
+    <!-- 施錠された機密ファイルのビジュアル -->
+    <div class="s0-file">
+      <div class="s0-stamp-restricted">CASE FILE #2022-MTD<br>ACCESS RESTRICTED</div>
+      <div class="s0-lock" id="s0-lock">
+        <div class="s0-lock-shackle"></div>
+        <div class="s0-lock-body"></div>
+      </div>
+    </div>
+
+    <!-- 導入テキスト(typewriteで表示) -->
+    <div class="paper s0-briefing">
+      <p id="s0-intro"></p>
+    </div>
+
+    <!-- パスワード入力 -->
+    <div class="s0-input-row" id="s0-input-row">
+      <input type="text" id="s0-password" class="s0-password-input" placeholder="PASSWORD" autocomplete="off" spellcheck="false">
+      <button type="button" class="btn" id="s0-unlock-btn">UNLOCK</button>
+    </div>
+    <div class="s0-feedback" id="s0-feedback"></div>
+
+    <!-- 段階式ヒント -->
+    <div class="hint-box">
+      <button type="button" class="btn hint-btn" id="s0-hint-btn">💡 ヒント</button>
+      <div class="hint-area" id="s0-hint-area"></div>
+    </div>
+  </div>
+</section>
+
+<section class="stage" id="stage-1">
+  <style>
+    /* ===== STAGE1: コルクボード証拠集め 専用スタイル (プレフィックス s1-) ===== */
+    #stage-1 .s1-corkboard{
+      position:relative;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(0,0,0,.08) 0, transparent 40%),
+        radial-gradient(circle at 80% 60%, rgba(0,0,0,.1) 0, transparent 45%),
+        repeating-linear-gradient(45deg, rgba(0,0,0,.03) 0 2px, transparent 2px 6px),
+        var(--cork);
+      border:10px solid #3a2a1e;
+      border-radius:6px;
+      box-shadow:inset 0 0 40px rgba(0,0,0,.5), 0 10px 25px rgba(0,0,0,.5);
+      padding:36px 24px;
+      display:grid;
+      grid-template-columns:repeat(3, minmax(140px, 1fr));
+      gap:34px 24px;
+    }
+    #stage-1 .s1-card{
+      position:relative;
+      cursor:pointer;
+      user-select:none;
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    #stage-1 .s1-card:hover{
+      transform:scale(1.05) rotate(0deg) !important;
+      box-shadow:0 12px 22px rgba(0,0,0,.55);
+      z-index:5;
+    }
+    #stage-1 .s1-card .s1-card-paper{
+      background:var(--paper);
+      color:var(--ink);
+      padding:14px 12px 16px;
+      min-height:120px;
+      box-shadow:0 6px 14px rgba(0,0,0,.45);
+      border-radius:2px;
+    }
+    /* 赤いピン(疑似要素) */
+    #stage-1 .s1-card::before{
+      content:"";
+      position:absolute;
+      top:-9px;
+      left:50%;
+      width:16px;
+      height:16px;
+      margin-left:-8px;
+      background:radial-gradient(circle at 35% 35%, #ff6b5b, var(--stamp) 70%);
+      border-radius:50%;
+      box-shadow:0 2px 3px rgba(0,0,0,.6);
+      z-index:2;
+    }
+    #stage-1 .s1-card-tag{
+      font-family:'Special Elite', monospace;
+      font-size:.68rem;
+      color:var(--dim);
+      letter-spacing:1px;
+      margin-bottom:6px;
+    }
+    #stage-1 .s1-card-title{
+      font-family:'Yomogi', sans-serif;
+      font-size:.98rem;
+      line-height:1.4;
+    }
+    #stage-1 .s1-card .stamp{
+      position:absolute;
+      top:6px;
+      right:2px;
+      font-size:1.1rem;
+      pointer-events:none;
+    }
+    #stage-1 .s1-next-wrap{
+      display:flex;
+      justify-content:center;
+      margin-top:28px;
+    }
+    #stage-1 #s1-next{
+      display:none;
+    }
+
+    /* モーダル中身 */
+    #stage-1 .s1-modal-card{
+      max-width:480px;
+      width:90vw;
+      padding:26px 24px;
+      transform:rotate(0deg);
+    }
+    #stage-1 .s1-modal-tag{
+      font-family:'Special Elite', monospace;
+      color:var(--stamp);
+      font-size:.8rem;
+      letter-spacing:1px;
+      margin-bottom:10px;
+    }
+    #stage-1 .s1-modal-card h3{
+      font-family:'Yomogi', sans-serif;
+      margin:0 0 14px;
+      font-size:1.25rem;
+    }
+    #stage-1 .s1-modal-card p{
+      font-family:'Yomogi', sans-serif;
+      line-height:1.9;
+      margin:0 0 20px;
+    }
+
+    @media (max-width:600px){
+      #stage-1 .s1-corkboard{
+        grid-template-columns:repeat(2, 1fr);
+        gap:30px 16px;
+        padding:30px 16px;
+      }
+      #stage-1 .s1-card .s1-card-paper{
+        min-height:100px;
+        padding:12px 10px 14px;
+      }
+      #stage-1 .s1-card-title{ font-size:.88rem; }
+    }
+  </style>
+
+  <div class="s1-corkboard" id="s1-corkboard">
+    <!-- カードはJSでEVIDENCEから動的生成 -->
+  </div>
+
+  <div class="s1-next-wrap">
+    <button type="button" class="btn-next" id="s1-next">NEXT →</button>
+  </div>
+
+  <!-- 証拠拡大表示モーダル(このsection内に自前で用意) -->
+  <div class="modal-overlay" id="s1-modal">
+    <div class="paper s1-modal-card">
+      <div class="s1-modal-tag" id="s1-modal-tag"></div>
+      <h3 id="s1-modal-title"></h3>
+      <p id="s1-modal-body"></p>
+      <button type="button" class="btn" id="s1-modal-close">CLOSE</button>
+    </div>
+  </div>
+</section>
+
+<section class="stage" id="stage-2">
+  <div class="s2-wrap">
+    <h2 class="s2-heading">STAGE 2 — 赤い糸</h2>
+    <p class="s2-instructions">関連する証拠同士を糸で結べ。正しい組み合わせは推理メモになる(3つで突破)。</p>
+
+    <!-- 段階式ヒント -->
+    <div class="hint-box">
+      <button type="button" class="btn hint-btn" id="s2-hint-btn">💡 ヒント</button>
+      <div class="hint-area" id="s2-hint-area"></div>
+    </div>
+
+    <!-- 盤面: position:relative。カードとSVG(糸)を重ねて配置する -->
+    <div class="s2-board" id="s2-board">
+      <svg id="s2-svg"></svg>
+      <div class="s2-cards" id="s2-cards"></div>
+    </div>
+
+    <div class="s2-memos-wrap">
+      <h3 class="s2-memos-title">推理メモ <span id="s2-memo-count">(0/3)</span></h3>
+      <div id="s2-memos" class="s2-memos"></div>
+    </div>
+
+    <button class="btn btn-next" id="s2-next" style="display:none;">NEXT →</button>
+  </div>
+
+  <style>
+    /* ===== STAGE2: 赤い糸マッチング専用スタイル(idは s2- プレフィックス) ===== */
+    #stage-2 .s2-wrap{
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1rem 2rem;
+    }
+    #stage-2 .s2-heading{
+      font-family: 'Special Elite', monospace;
+      color: var(--paper);
+      text-align: center;
+      letter-spacing: .08em;
+      margin: 1.5rem 0 .5rem;
+    }
+    #stage-2 .s2-instructions{
+      font-family: 'Yomogi', sans-serif;
+      color: var(--dim);
+      text-align: center;
+      margin: 0 0 1.5rem;
+      line-height: 1.6;
+    }
+
+    /* 盤面。カードとSVGの糸をここに重ねる */
+    #stage-2 .s2-board{
+      position: relative;
+      min-height: 380px;
+      padding: 1.5rem 0;
+    }
+    #stage-2 #s2-svg{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* 糸がカードのポインタ操作を邪魔しない */
+      overflow: visible;
+      z-index: 0;
+    }
+    #stage-2 .s2-line-confirmed{
+      stroke: var(--thread);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,.55));
+    }
+    #stage-2 .s2-line-wrong{
+      stroke: var(--thread-wrong);
+      stroke-width: 2;
+      stroke-linecap: round;
+      opacity: 1;
+      transition: opacity .4s ease;
+    }
+    #stage-2 .s2-line-wrong.s2-fade{ opacity: 0; }
+    #stage-2 .s2-line-temp{
+      stroke: var(--thread);
+      stroke-width: 2;
+      stroke-dasharray: 5 5;
+      opacity: .85;
+      display: none;
+    }
+
+    /* カード配置: グリッド1つで desktop(左3・右3) / mobile(2列3段) を切り替える */
+    #stage-2 .s2-cards{
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      grid-template-rows: repeat(3, auto);
+      grid-auto-flow: column; /* desktop: 1,2,3が左列 / 4,5,6が右列 */
+      justify-items: center;
+      align-items: center;
+      row-gap: 2.6rem;
+      column-gap: 4rem;
+    }
+    #stage-2 .s2-card{
+      width: 108px;
+      padding: .6rem .5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .35rem;
+      text-align: center;
+      cursor: grab;
+      touch-action: none; /* ドラッグ中にページがスクロールしないように */
+      -webkit-user-select: none;
+      user-select: none;
+      transform: rotate(var(--r, 0deg));
+      transition: box-shadow .15s ease, transform .15s ease;
+    }
+    #stage-2 .s2-card:active{ cursor: grabbing; }
+    #stage-2 .s2-card-num{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--stamp);
+      color: var(--paper);
+      font-family: 'Special Elite', monospace;
+      font-size: .82rem;
+    }
+    #stage-2 .s2-card-title{
+      font-family: 'Yomogi', sans-serif;
+      font-size: .78rem;
+      line-height: 1.35;
+      color: var(--ink);
+    }
+    #stage-2 .s2-card.s2-selected{
+      outline: 3px solid var(--thread);
+      outline-offset: 3px;
+      box-shadow: 0 0 14px rgba(192,57,43,.65);
+    }
+    #stage-2 .s2-card.s2-linked .s2-card-num{
+      background: var(--thread);
+    }
+
+    /* モバイル: 2列3段(行優先で並べる) */
+    @media (max-width: 600px){
+      #stage-2 .s2-cards{
+        grid-auto-flow: row;
+        row-gap: 1.4rem;
+        column-gap: 1.2rem;
+      }
+      #stage-2 .s2-card{
+        width: 100%;
+        max-width: 150px;
+      }
+      #stage-2 .s2-board{ min-height: 420px; }
+    }
+
+    #stage-2 .s2-memos-wrap{
+      margin-top: 2rem;
+    }
+    #stage-2 .s2-memos-title{
+      font-family: 'Special Elite', monospace;
+      color: var(--paper);
+      margin: 0 0 .8rem;
+      text-align: center;
+    }
+    #stage-2 .s2-memos{
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+    }
+    #stage-2 .s2-memo{
+      max-width: 260px;
+      font-family: 'Yomogi', sans-serif;
+      font-size: .85rem;
+      line-height: 1.5;
+      padding: .9rem 1.1rem;
+    }
+    #stage-2 #s2-next{
+      display: block;
+      margin: 2rem auto 0;
+    }
+  </style>
+</section>
+
+<section class="stage" id="stage-3">
+  <style>
+    /* STAGE3: 暗号解読 専用スタイル */
+    #stage-3 .paper{ max-width:640px; margin:0 auto; padding:28px 24px; }
+    #stage-3 h2{ font-family:'Special Elite', monospace; margin-top:0; }
+    .s3-lead{ color:var(--ink); opacity:.85; font-size:.95em; }
+    .s3-cipher-box{
+      background:rgba(0,0,0,.06);
+      border:1px dashed var(--dim);
+      padding:16px;
+      margin:16px 0;
+      text-align:center;
+      word-break:break-all;
+    }
+    .s3-mono{
+      font-family:'Special Elite', monospace;
+      font-size:1.15em;
+      letter-spacing:.08em;
+      color:var(--ink);
+      margin:0;
+    }
+    .s3-slider-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:18px 0 6px;
+      font-family:'Special Elite', monospace;
+      flex-wrap:wrap;
+    }
+    .s3-slider-row input[type=range]{ flex:1; min-width:140px; }
+    #s3-decoded{
+      background:rgba(192,57,43,.08);
+      border:1px solid var(--thread);
+      padding:14px;
+      min-height:1.4em;
+      text-align:center;
+      margin-bottom:20px;
+    }
+    .s3-input-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .s3-input-row input[type=text]{
+      flex:1;
+      min-width:160px;
+      font-family:'Special Elite', monospace;
+      padding:10px;
+      border:1px solid var(--ink);
+      background:var(--paper);
+      color:var(--ink);
+    }
+    .s3-message{
+      min-height:1.4em;
+      font-size:.9em;
+      color:var(--stamp);
+    }
+    .s3-success{
+      text-align:center;
+      font-family:'Special Elite', monospace;
+      font-size:1.3em;
+      color:var(--stamp);
+      letter-spacing:.05em;
+      margin-top:16px;
+      animation: s34-success-pop .5s ease-out;
+    }
+    @keyframes s34-success-pop{
+      0%{ transform:scale(1.6); opacity:0; }
+      100%{ transform:scale(1); opacity:1; }
+    }
+    @media (max-width:480px){
+      #stage-3 .paper{ padding:18px 14px; }
+      .s3-mono{ font-size:.95em; }
+    }
+  </style>
+  <div class="paper" style="transform:rotate(-0.4deg);">
+    <h2>STAGE 3 — 暗号解読</h2>
+    <p class="s3-lead">攻撃者が残した最後のログが見つかった。シーザー暗号で書かれているようだ。</p>
+    <div class="s3-cipher-box">
+      <p class="s3-mono" id="s3-cipher">WKH ILQDO NHB LV EXOOILJKWHU</p>
+    </div>
+    <div class="s3-slider-row">
+      <label for="s3-shift">シフト数: <strong id="s3-shift-val">0</strong></label>
+      <input type="range" id="s3-shift" min="0" max="25" step="1" value="0">
+    </div>
+    <p class="s3-mono" id="s3-decoded">WKH ILQDO NHB LV EXOOILJKWHU</p>
+    <div class="s3-input-row">
+      <input type="text" id="s3-keyword" placeholder="鍵となる単語を入力…" autocomplete="off">
+      <button class="btn" id="s3-submit" type="button">SUBMIT</button>
+    </div>
+    <p class="s3-message" id="s3-message"></p>
+    <!-- 段階式ヒント(最初から表示。旧: 3回失敗で出現する方式は撤去) -->
+    <div class="hint-box">
+      <button type="button" class="btn hint-btn" id="s3-hint-btn">💡 ヒント</button>
+      <div class="hint-area" id="s3-hint-area"></div>
+    </div>
+    <div class="s3-success" id="s3-success" style="display:none;"></div>
+  </div>
+</section>
+
+<section class="stage" id="stage-4">
+  <style>
+    /* STAGE4: 動機の推理 専用スタイル */
+    #stage-4 .paper{ max-width:760px; margin:0 auto; padding:28px 24px; }
+    #stage-4 h2{ font-family:'Special Elite', monospace; margin-top:0; }
+    .s4-summary{
+      background:rgba(0,0,0,.05);
+      border:1px solid var(--dim);
+      padding:14px 16px;
+      margin-bottom:14px;
+    }
+    .s4-summary h3{
+      font-family:'Special Elite', monospace;
+      font-size:.9em;
+      margin:0 0 8px;
+      color:var(--ink);
+      opacity:.8;
+    }
+    #s4-evidence-summary{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+    .s4-ev-item{
+      font-size:.82em;
+      background:var(--paper);
+      border:1px solid var(--ink);
+      padding:4px 8px;
+      white-space:nowrap;
+    }
+    .s4-ev-tag{ font-family:'Special Elite', monospace; color:var(--thread); margin-right:4px; }
+    #s4-memos ul{ margin:0; padding-left:20px; }
+    #s4-memos li{ font-size:.92em; margin-bottom:4px; }
+    .s4-memo-empty{ font-size:.9em; color:var(--dim); margin:0; }
+    #s4-review-btn{ display:block; margin:14px 0 22px; }
+    .s4-hypotheses{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:14px;
+      margin-bottom:14px;
+    }
+    .s4-hypo-card{
+      position:relative;
+      border:2px solid var(--ink);
+      background:var(--paper);
+      padding:14px 12px;
+      cursor:pointer;
+      transition:border-color .15s, transform .15s;
+      overflow:hidden;
+    }
+    .s4-hypo-card:hover{ transform:translateY(-2px); }
+    .s4-hypo-card h4{
+      font-family:'Special Elite', monospace;
+      margin:0 0 6px;
+      font-size:1em;
+    }
+    .s4-hypo-card p{ font-size:.85em; margin:0; opacity:.85; }
+    .s4-hypo-card.selected{
+      border-color:var(--stamp);
+      border-width:3px;
+      box-shadow:0 0 0 2px rgba(169,50,38,.2) inset;
+    }
+    .s4-hypo-card.selected::after{
+      content:"選択中";
+      position:absolute;
+      top:8px;
+      right:-26px;
+      transform:rotate(35deg);
+      background:var(--stamp);
+      color:#f5efe0;
+      font-family:'Special Elite', monospace;
+      font-size:.72em;
+      padding:2px 30px;
+      letter-spacing:.1em;
+      opacity:.9;
+    }
+    .s4-note{
+      font-size:.85em;
+      color:var(--dim);
+      font-style:italic;
+      margin:6px 0 18px;
+    }
+    #s4-decide-btn:disabled{
+      opacity:.4;
+      cursor:not-allowed;
+    }
+    #s4-modal .paper{
+      max-width:560px;
+      max-height:80vh;
+      overflow-y:auto;
+      margin:0 auto;
+      padding:22px;
+    }
+    .s4-modal-ev{ margin-bottom:14px; }
+    .s4-modal-ev h4{
+      font-family:'Special Elite', monospace;
+      margin:0 0 4px;
+      font-size:.95em;
+    }
+    .s4-modal-ev p{ margin:0; font-size:.9em; }
+    @media (max-width:600px){
+      .s4-hypotheses{ grid-template-columns:1fr; }
+      #s4-evidence-summary{ flex-direction:column; }
+      .s4-ev-item{ white-space:normal; }
+    }
+  </style>
+  <div class="paper" style="transform:rotate(0.3deg);">
+    <h2>STAGE 4 — 動機の推理</h2>
+    <div class="s4-summary">
+      <h3>証拠一覧</h3>
+      <div id="s4-evidence-summary"></div>
+      <h3>推理メモ</h3>
+      <div id="s4-memos"></div>
+    </div>
+    <button class="btn" id="s4-review-btn" type="button">証拠を再確認する</button>
+
+    <div class="s4-hypotheses">
+      <div class="s4-hypo-card" data-key="nation">
+        <h4>国家関与説</h4>
+        <p>特定国家の諜報機関が関与している。</p>
+      </div>
+      <div class="s4-hypo-card" data-key="mercenary">
+        <h4>高級傭兵説</h4>
+        <p>金銭で雇われた独立系の凄腕集団。</p>
+      </div>
+      <div class="s4-hypo-card" data-key="independent">
+        <h4>単独ハッカー集団説</h4>
+        <p>国家と無関係な非常に高度な民間グループ。</p>
+      </div>
+    </div>
+    <p class="s4-note">どれを選んでも構いません。これは公式な結論ではなく、あなたの推理です。</p>
+    <button class="btn btn-next" id="s4-decide-btn" type="button" disabled>この仮説で結論を出す</button>
+  </div>
+
+  <div class="modal-overlay" id="s4-modal">
+    <div class="paper">
+      <button class="btn" id="s4-modal-close" type="button">CLOSE</button>
+      <div id="s4-modal-body"></div>
+    </div>
+  </div>
+</section>
+
+<section class="stage" id="stage-ending">
+  <style>
+    /* ENDING: ケースクローズ 専用スタイル */
+    #stage-ending .paper{ max-width:640px; margin:0 auto; padding:32px 26px; text-align:left; position:relative; }
+    #end-stamp-wrap{ text-align:center; margin-bottom:18px; }
+    #end-stamp-wrap.end-stamp-anim{ animation: end-stamp-slam .6s cubic-bezier(.36,1.6,.4,1) both; }
+    @keyframes end-stamp-slam{
+      0%{ transform:scale(3); opacity:0; }
+      55%{ transform:scale(.85); opacity:1; }
+      75%{ transform:scale(1.08); }
+      100%{ transform:scale(1); opacity:1; }
+    }
+    #end-text .end-lead{
+      font-family:'Special Elite', monospace;
+      color:var(--stamp);
+      font-size:1.05em;
+      margin-bottom:8px;
+    }
+    #end-text p{ line-height:1.9; }
+    #end-fixed-text{
+      margin-top:18px;
+      padding-top:14px;
+      border-top:1px dashed var(--dim);
+      line-height:1.9;
+      font-size:.95em;
+      color:var(--ink);
+      opacity:.9;
+    }
+    #end-time{
+      font-family:'Special Elite', monospace;
+      text-align:center;
+      margin:18px 0;
+      font-size:1.05em;
+    }
+    #end-restart-btn{ display:block; margin:0 auto; }
+    @media (max-width:480px){
+      #stage-ending .paper{ padding:20px 14px; }
+    }
+  </style>
+  <div class="paper" style="transform:rotate(-0.2deg);">
+    <div id="end-stamp-wrap">
+      <div class="stamp" id="end-stamp">CASE CLOSED</div>
+    </div>
+    <div id="end-text"></div>
+    <p id="end-fixed-text">ここまでの推理、お疲れ様でした。しかし——実在するMetadorの正体は、2026年現在も未解明のままです。スペイン語の痕跡、ポップパンクの歌詞、アルゼンチンの風刺漫画。バラバラな手がかりは、いまだに一本の線にはなっていません。あなたが今組み立てた推理は、実在する研究者たちの報告書をもとに私たちが創作したオリジナル仮説です。</p>
+    <p id="end-time"></p>
+    <button class="btn btn-next" id="end-restart-btn" type="button">もう一度捜査する</button>
+  </div>
+</section>
+</main>
+
+<footer>社会情報学実習 課題1 — Metador APT 独自仮説プロジェクト</footer>
+
+<script>
+/* ==========================================================
+   METADOR FILE — コアJS (SHELL担当)
+   他ステージのスクリプトはこれらのグローバルを呼んでよい。
+   再定義は禁止(グローバル汚染防止のため各ステージはIIFEで包むこと)。
+   ========================================================== */
+
+// --- グローバル状態 ---
+const G = {
+  startTime: null,      // Date.now()。DOMContentLoaded時にセット
+  opened: new Set(),    // STAGE1で開いた証拠id
+  memos: [],            // STAGE2で完成した推理メモ(文字列配列)
+  choice: null,          // STAGE4で選んだ仮説 'nation' | 'mercenary' | 'independent'
+};
+
+// --- ステージ登録・遷移 ---
+const STAGE_INIT = {}; // key: '0'|'1'|'2'|'3'|'4'|'ending' -> 初期化関数
+
+function registerStage(key, fn){
+  STAGE_INIT[key] = fn;
+}
+
+// 進行バーの順序(indexOfで現在位置を判定するために使用)
+const STAGE_ORDER = ['0', '1', '2', '3', '4', 'ending'];
+
+function showStage(key){
+  // 1. 全 .stage から active を外す
+  document.querySelectorAll('.stage').forEach(function(el){
+    el.classList.remove('active');
+  });
+
+  // 2. 対象の section に active を付与(存在しない場合はガードして落ちないようにする)
+  const target = document.getElementById('stage-' + key);
+  if(target){
+    target.classList.add('active');
+  } else {
+    console.warn('showStage: #stage-' + key + ' が見つかりません');
+  }
+
+  // 3. 進行状況バーの更新
+  const currentIdx = STAGE_ORDER.indexOf(key);
+  document.querySelectorAll('#progress .progress-step').forEach(function(step){
+    step.classList.remove('current', 'done');
+    if(key === 'ending'){
+      // エンディングでは全ステップ完了扱い
+      step.classList.add('done');
+      return;
+    }
+    const stepIdx = STAGE_ORDER.indexOf(step.getAttribute('data-stage'));
+    if(currentIdx < 0 || stepIdx < 0) return;
+    if(stepIdx < currentIdx){
+      step.classList.add('done');
+    } else if(stepIdx === currentIdx){
+      step.classList.add('current');
+    }
+  });
+
+  // 4. 各ステージの初期化関数があれば毎回呼ぶ
+  if(typeof STAGE_INIT[key] === 'function'){
+    STAGE_INIT[key]();
+  }
+
+  // 5. 画面トップへスクロール
+  window.scrollTo(0, 0);
+}
+
+// --- ユーティリティ ---
+
+// body に .flash を付けて400ms後に外す(画面を赤くフラッシュさせる)
+function flashScreen(){
+  document.body.classList.remove('flash');
+  // 再付与でアニメーションを確実に再生させるため一度クラスを外してから付ける
+  void document.body.offsetWidth; // reflow強制
+  document.body.classList.add('flash');
+  setTimeout(function(){
+    document.body.classList.remove('flash');
+  }, 400);
+}
+
+// el に text を1文字ずつタイプライター表示する。Promiseを返す
+function typewrite(el, text, speed){
+  speed = speed || 35;
+  if(!el) return Promise.resolve();
+  el.textContent = '';
+  return new Promise(function(resolve){
+    let i = 0;
+    (function step(){
+      if(i < text.length){
+        el.textContent += text.charAt(i);
+        i++;
+        setTimeout(step, speed);
+      } else {
+        resolve();
+      }
+    })();
+  });
+}
+
+// G.startTime からの経過時間を "MM:SS" 形式で返す
+function elapsedString(){
+  if(!G.startTime) return '00:00';
+  const totalSec = Math.max(0, Math.floor((Date.now() - G.startTime) / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// --- 証拠データ(全ステージ共有) ---
+const EVIDENCE = [
+  { id:1, tag:"EXHIBIT 01", title:"通信ログの断片",
+    body:"C2サーバーとの通信の一部がスペイン語で記述されていた。" },
+  { id:2, tag:"EXHIBIT 02", title:"文化的痕跡A",
+    body:"マルウェア内のコード文字列に、英国のポップパンクバンドの歌詞の一部が含まれていた(バンド名は伏せられている)。" },
+  { id:3, tag:"EXHIBIT 03", title:"文化的痕跡B",
+    body:"マルウェアコンポーネントの一つが \"Mafalda\" と名付けられていた。Mafaldaはアルゼンチンの国民的風刺漫画のキャラクター名。" },
+  { id:4, tag:"EXHIBIT 04", title:"被害組織リスト",
+    body:"標的は通信会社・大学・政府系機関など、地理的にも業種的にも一貫性がない。" },
+  { id:5, tag:"EXHIBIT 05", title:"技術力の証拠",
+    body:"マルウェアは極めて高度で、長期間検知を逃れる設計。第三国のインフラを経由し、追跡を困難にしていた。" },
+  { id:6, tag:"EXHIBIT 06", title:"命名の経緯",
+    body:"セキュリティ研究者が便宜上つけたコードネームであり、公式な帰属(国家等)は一切確認されていない。" },
+];
+
+// --- 段階式ヒント ---
+// btnId のボタンを押すたびに hints 配列から次の1件を areaId 内に .hint-line として追加する。
+// 全部出し切ったらボタンのラベルを「ヒントは以上」にして disabled にする。
+// 同じボタンに二重でイベントを貼らないよう data-bound で防止する。
+function setupHints(btnId, areaId, hints){
+  var btn = document.getElementById(btnId);
+  var area = document.getElementById(areaId);
+  if(!btn || !area) return;
+  if(btn.dataset.bound) return; // 二重バインド防止
+  btn.dataset.bound = '1';
+
+  var idx = 0;
+  btn.addEventListener('click', function(){
+    if(idx >= hints.length) return;
+    var line = document.createElement('p');
+    line.className = 'hint-line';
+    line.textContent = hints[idx];
+    area.appendChild(line);
+    idx++;
+    if(idx >= hints.length){
+      btn.textContent = '💡 ヒントは以上';
+      btn.disabled = true;
+    }
+  });
+}
+
+// --- 起動 ---
+document.addEventListener('DOMContentLoaded', function(){
+  G.startTime = Date.now();
+  showStage('0');
+});
+</script>
+<script>
+(function(){
+  /* ================= STAGE0: ブリーフィング/ロック画面 ================= */
+
+  // typewriteの二重表示防止フラグ
+  var s0IntroShown = false;
+
+  var s0IntroText =
+    "2022年、通信会社・大学・政府系機関など、複数の組織を標的にした極めて洗練されたサイバー攻撃の痕跡が確認された。\n" +
+    "攻撃者の正体は依然として不明。手掛かりは、これを分析したセキュリティ研究者たちが便宜的に付けたコードネームのみ。\n" +
+    "このマルウェアは \"メスを持つ闘牛士\" を意味する名で呼ばれている。\n" +
+    "ファイルへのアクセスには、そのコードネームの入力が必要だ。";
+
+  // レーベンシュタイン距離(編集距離)を計算する
+  function s0Levenshtein(a, b){
+    var m = a.length, n = b.length;
+    var dp = [];
+    for (var i = 0; i <= m; i++){
+      dp.push([i]);
+    }
+    for (var j = 0; j <= n; j++){
+      dp[0][j] = j;
+    }
+    for (i = 1; i <= m; i++){
+      for (j = 1; j <= n; j++){
+        var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,      // 削除
+          dp[i][j - 1] + 1,      // 挿入
+          dp[i - 1][j - 1] + cost // 置換
+        );
+      }
+    }
+    return dp[m][n];
+  }
+
+  // 入力を正規化(大文字化 + 英字以外を除去)して正解判定
+  function s0CheckPassword(raw){
+    var normalized = String(raw).toUpperCase().replace(/[^A-Z]/g, '');
+    if (normalized === 'METADOR' || normalized === 'MATADOR') return true;
+    if (s0Levenshtein(normalized, 'METADOR') <= 1) return true;
+    return false;
+  }
+
+  function s0HandleUnlock(){
+    var input = document.getElementById('s0-password');
+    var row = document.getElementById('s0-input-row');
+    var feedback = document.getElementById('s0-feedback');
+    if (!input) return;
+
+    if (s0CheckPassword(input.value)){
+      // 正解: 錠が開くアニメーション → 1秒後に次のステージへ
+      feedback.textContent = 'ACCESS GRANTED';
+      feedback.classList.add('s0-ok');
+      var lock = document.getElementById('s0-lock');
+      if (lock) lock.classList.add('s0-unlocking');
+      input.disabled = true;
+      var btn = document.getElementById('s0-unlock-btn');
+      if (btn) btn.disabled = true;
+      setTimeout(function(){
+        showStage('1');
+      }, 1000);
+    } else {
+      // 不正解: フラッシュ + シェイク
+      flashScreen();
+      feedback.classList.remove('s0-ok');
+      feedback.textContent = 'ACCESS DENIED';
+      row.classList.remove('s0-shake');
+      // reflowでアニメーションを再トリガー
+      void row.offsetWidth;
+      row.classList.add('s0-shake');
+    }
+  }
+
+  registerStage('0', function(){
+    if (!s0IntroShown){
+      s0IntroShown = true;
+      var introEl = document.getElementById('s0-intro');
+      if (introEl) typewrite(introEl, s0IntroText, 28);
+    }
+
+    var btn = document.getElementById('s0-unlock-btn');
+    var input = document.getElementById('s0-password');
+    if (btn && !btn.dataset.bound){
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', s0HandleUnlock);
+    }
+    if (input && !input.dataset.bound){
+      input.dataset.bound = '1';
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') s0HandleUnlock();
+      });
+    }
+
+    setupHints('s0-hint-btn', 's0-hint-area', [
+      '導入文をもう一度読め。"闘牛士" をスペイン語にすると…?',
+      '答えは METADOR。多少の綴りミスは許容される'
+    ]);
+  });
+})();
+
+(function(){
+  /* ================= STAGE1: コルクボード証拠集め ================= */
+
+  // カードごとの傾き(見た目のばらつき用。EVIDENCEのid順に対応)
+  var s1Rotations = { 1: -6, 2: 4, 3: -3, 4: 7, 5: -5, 6: 3 };
+
+  var s1CardsBuilt = false;
+
+  function s1BuildCards(){
+    var board = document.getElementById('s1-corkboard');
+    if (!board) return;
+    board.innerHTML = '';
+    EVIDENCE.forEach(function(ev){
+      var card = document.createElement('div');
+      card.className = 's1-card';
+      card.dataset.id = ev.id;
+      var rot = s1Rotations[ev.id] || 0;
+      card.style.transform = 'rotate(' + rot + 'deg)';
+
+      var paper = document.createElement('div');
+      paper.className = 's1-card-paper';
+
+      var tag = document.createElement('div');
+      tag.className = 's1-card-tag';
+      tag.textContent = ev.tag;
+
+      var title = document.createElement('div');
+      title.className = 's1-card-title';
+      title.textContent = ev.title;
+
+      paper.appendChild(tag);
+      paper.appendChild(title);
+      card.appendChild(paper);
+      board.appendChild(card);
+    });
+
+    // クリック(タップ)で拡大表示。イベント委譲で1回だけ登録
+    board.addEventListener('click', function(e){
+      var card = e.target.closest('.s1-card');
+      if (!card) return;
+      s1OpenEvidence(Number(card.dataset.id));
+    });
+  }
+
+  function s1OpenEvidence(id){
+    var ev = EVIDENCE.find(function(e){ return e.id === id; });
+    if (!ev) return;
+
+    // 開いた証拠として記録
+    G.opened.add(id);
+
+    // 「済」スタンプを対象カードに付与
+    var card = document.querySelector('#s1-corkboard .s1-card[data-id="' + id + '"]');
+    if (card && !card.querySelector('.stamp')){
+      var stamp = document.createElement('div');
+      stamp.className = 'stamp';
+      stamp.textContent = '済';
+      card.appendChild(stamp);
+    }
+
+    // モーダルに内容を反映して表示
+    document.getElementById('s1-modal-tag').textContent = ev.tag;
+    document.getElementById('s1-modal-title').textContent = ev.title;
+    document.getElementById('s1-modal-body').textContent = ev.body;
+    document.getElementById('s1-modal').classList.add('open');
+
+    s1CheckComplete();
+  }
+
+  function s1CloseModal(){
+    var modal = document.getElementById('s1-modal');
+    if (modal) modal.classList.remove('open');
+  }
+
+  function s1CheckComplete(){
+    var nextBtn = document.getElementById('s1-next');
+    if (!nextBtn) return;
+    if (G.opened.size >= EVIDENCE.length){
+      nextBtn.style.display = 'inline-block';
+    }
+  }
+
+  registerStage('1', function(){
+    if (!s1CardsBuilt){
+      s1CardsBuilt = true;
+      s1BuildCards();
+
+      var closeBtn = document.getElementById('s1-modal-close');
+      if (closeBtn) closeBtn.addEventListener('click', s1CloseModal);
+
+      // オーバーレイの背景クリックでも閉じる
+      var overlay = document.getElementById('s1-modal');
+      if (overlay){
+        overlay.addEventListener('click', function(e){
+          if (e.target === overlay) s1CloseModal();
+        });
+      }
+
+      var nextBtn = document.getElementById('s1-next');
+      if (nextBtn){
+        nextBtn.addEventListener('click', function(){
+          showStage('2');
+        });
+      }
+    }
+    // 再訪問時にもスタンプ・NEXTボタンの状態を反映
+    EVIDENCE.forEach(function(ev){
+      if (G.opened.has(ev.id)){
+        var card = document.querySelector('#s1-corkboard .s1-card[data-id="' + ev.id + '"]');
+        if (card && !card.querySelector('.stamp')){
+          var stamp = document.createElement('div');
+          stamp.className = 'stamp';
+          stamp.textContent = '済';
+          card.appendChild(stamp);
+        }
+      }
+    });
+    s1CheckComplete();
+  });
+})();
+</script>
+
+<script>
+(function(){
+  // STAGE2: 赤い糸マッチングパズル
+  // 接続操作は「Pointer Eventsドラッグ」と「タップ選択」の両方に対応する。
+  // 実装上は1本のポインターイベント経路で両方を扱う:
+  //   ・pointerdown→大きく動かさずpointerup した場合 = タップ(選択トグル/接続)
+  //   ・pointerdown→動かして別カード上でpointerup した場合 = ドラッグ接続
+  // こうすることでマウス/タッチ両方に自然に対応できる。
+
+  var initialized = false; // 二重初期化防止フラグ
+
+  // 正解ペアと、成立時に追加される推理メモ
+  var PAIRS = [
+    { a:1, b:3, memo:"スペイン語圏との強い関連 — 言語と風刺漫画、二つの痕跡が同じ文化圏を指している" },
+    { a:2, b:5, memo:"高度な技術力を持つ組織的犯行 — 洗練された設計と英語圏文化への親和性" },
+    { a:4, b:5, memo:"採算度外視の作戦 — 一貫性のない標的に高コストな攻撃。背後に依頼主がいる可能性" },
+    { a:2, b:3, memo:"多文化的な痕跡 — 多国籍のメンバー構成、あるいは意図的な偽装工作" },
+    { a:4, b:6, memo:"徹底した匿名性 — 帰属の手がかりを一切残さない、正体隠蔽への強い意志" }
+  ];
+
+  var board = null;       // #s2-board
+  var svg = null;         // #s2-svg
+  var tempLine = null;    // ドラッグ中の仮の糸
+  var confirmed = [];     // 定着済みの正解ペア [{a,b}]
+  var selectedCard = null;// タップ選択中のカード要素
+  var dragFrom = null;    // ドラッグ中の起点カード要素
+
+  // --- カード生成(EVIDENCEから) ---
+  function buildCards(){
+    var wrap = document.getElementById('s2-cards');
+    wrap.innerHTML = '';
+    EVIDENCE.forEach(function(ev){
+      var card = document.createElement('div');
+      card.className = 'paper s2-card';
+      card.dataset.id = String(ev.id);
+      card.style.setProperty('--r', (Math.random() * 3 - 1.5).toFixed(2) + 'deg');
+      card.draggable = false;
+
+      var num = document.createElement('span');
+      num.className = 's2-card-num';
+      num.textContent = String(ev.id);
+
+      var title = document.createElement('span');
+      title.className = 's2-card-title';
+      title.textContent = ev.title;
+
+      card.appendChild(num);
+      card.appendChild(title);
+      wrap.appendChild(card);
+
+      card.addEventListener('dragstart', function(e){ e.preventDefault(); });
+      card.addEventListener('pointerdown', onPointerDown);
+      card.addEventListener('pointermove', onPointerMove);
+      card.addEventListener('pointerup', onPointerUp);
+      card.addEventListener('pointercancel', onPointerCancel);
+    });
+  }
+
+  function cardEl(id){
+    return board.querySelector('.s2-card[data-id="' + id + '"]');
+  }
+
+  // カード中心座標を盤面基準で取得
+  function centerOf(el){
+    var r = el.getBoundingClientRect();
+    var br = board.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - br.left, y: r.top + r.height / 2 - br.top };
+  }
+
+  function pairKey(a, b){
+    return a < b ? (a + '-' + b) : (b + '-' + a);
+  }
+
+  function findPair(a, b){
+    for (var i = 0; i < PAIRS.length; i++){
+      var p = PAIRS[i];
+      if ((p.a === a && p.b === b) || (p.a === b && p.b === a)) return p;
+    }
+    return null;
+  }
+
+  function isAlreadyConfirmed(a, b){
+    var key = pairKey(a, b);
+    return confirmed.some(function(c){ return pairKey(c.a, c.b) === key; });
+  }
+
+  // --- SVG描画 ---
+  function svgLine(className){
+    var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', className);
+    return line;
+  }
+
+  function setLineEnds(line, aId, bId){
+    var p1 = centerOf(cardEl(aId));
+    var p2 = centerOf(cardEl(bId));
+    line.setAttribute('x1', p1.x);
+    line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x);
+    line.setAttribute('y2', p2.y);
+  }
+
+  function addConfirmedLine(a, b){
+    var line = svgLine('s2-line-confirmed');
+    line.dataset.a = a;
+    line.dataset.b = b;
+    setLineEnds(line, a, b);
+    svg.appendChild(line);
+  }
+
+  function addWrongLine(a, b){
+    var line = svgLine('s2-line-wrong');
+    setLineEnds(line, a, b);
+    svg.appendChild(line);
+    // 1秒後にフェードアウトして削除(減点なし)
+    setTimeout(function(){
+      line.classList.add('s2-fade');
+      setTimeout(function(){ line.remove(); }, 450);
+    }, 1000);
+  }
+
+  // 盤面サイズが変わった時(リサイズ・レイアウト崩れ時)に糸を再描画
+  function redrawAll(){
+    if (!svg) return;
+    var lines = svg.querySelectorAll('.s2-line-confirmed');
+    lines.forEach(function(line){
+      var a = parseInt(line.dataset.a, 10);
+      var b = parseInt(line.dataset.b, 10);
+      setLineEnds(line, a, b);
+    });
+  }
+
+  // --- 仮の糸(ドラッグ中) ---
+  function ensureTempLine(){
+    if (tempLine) return;
+    tempLine = svgLine('s2-line-temp');
+    svg.appendChild(tempLine);
+  }
+
+  function updateTempLine(originCard, clientX, clientY){
+    var origin = centerOf(originCard);
+    var br = board.getBoundingClientRect();
+    tempLine.setAttribute('x1', origin.x);
+    tempLine.setAttribute('y1', origin.y);
+    tempLine.setAttribute('x2', clientX - br.left);
+    tempLine.setAttribute('y2', clientY - br.top);
+    tempLine.style.display = 'block';
+  }
+
+  function hideTempLine(){
+    if (tempLine) tempLine.style.display = 'none';
+  }
+
+  // --- メモ追加 ---
+  function addMemoCard(text){
+    var div = document.createElement('div');
+    div.className = 'paper s2-memo';
+    div.style.transform = 'rotate(' + (Math.random() * 4 - 2).toFixed(2) + 'deg)';
+    div.textContent = text;
+    document.getElementById('s2-memos').appendChild(div);
+    var countEl = document.getElementById('s2-memo-count');
+    if (countEl) countEl.textContent = '(' + G.memos.length + '/3)';
+  }
+
+  // --- 接続判定 ---
+  function tryConnect(aId, bId){
+    if (aId === bId) return;
+    if (isAlreadyConfirmed(aId, bId)) return; // 定着済みは無視
+
+    var pair = findPair(aId, bId);
+    if (pair){
+      confirmed.push({ a: aId, b: bId });
+      addConfirmedLine(aId, bId);
+      cardEl(aId).classList.add('s2-linked');
+      cardEl(bId).classList.add('s2-linked');
+      G.memos.push(pair.memo);
+      addMemoCard(pair.memo);
+
+      if (G.memos.length >= 3){
+        var nextBtn = document.getElementById('s2-next');
+        if (nextBtn) nextBtn.style.display = 'block';
+      }
+    } else {
+      addWrongLine(aId, bId);
+    }
+  }
+
+  // --- タップ選択 ---
+  function clearSelection(){
+    if (selectedCard){
+      selectedCard.classList.remove('s2-selected');
+      selectedCard = null;
+    }
+  }
+
+  function onCardTap(id, el){
+    if (!selectedCard){
+      selectedCard = el;
+      el.classList.add('s2-selected');
+    } else if (selectedCard === el){
+      clearSelection(); // 同じカード再タップで解除
+    } else {
+      var aId = parseInt(selectedCard.dataset.id, 10);
+      clearSelection();
+      tryConnect(aId, id);
+    }
+  }
+
+  // --- Pointer Events ---
+  function onPointerDown(e){
+    e.preventDefault();
+    dragFrom = e.currentTarget;
+    try { dragFrom.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    ensureTempLine();
+    updateTempLine(dragFrom, e.clientX, e.clientY);
+  }
+
+  function onPointerMove(e){
+    if (!dragFrom) return;
+    updateTempLine(dragFrom, e.clientX, e.clientY);
+  }
+
+  function onPointerUp(e){
+    if (!dragFrom) return;
+    hideTempLine();
+
+    var dropEl = document.elementFromPoint(e.clientX, e.clientY);
+    var dropCard = dropEl ? dropEl.closest('.s2-card') : null;
+    var originCard = dragFrom;
+
+    try { originCard.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    dragFrom = null;
+
+    if (dropCard && dropCard !== originCard){
+      // 別カードまでドラッグして離した = 接続を試みる
+      clearSelection();
+      tryConnect(parseInt(originCard.dataset.id, 10), parseInt(dropCard.dataset.id, 10));
+    } else if (dropCard === originCard){
+      // 動かさずに離した = タップ扱い(選択トグル/選択済みカードとの接続)
+      onCardTap(parseInt(originCard.dataset.id, 10), originCard);
+    }
+  }
+
+  function onPointerCancel(){
+    hideTempLine();
+    dragFrom = null;
+  }
+
+  // --- ステージ初期化 ---
+  registerStage('2', function(){
+    if (!initialized){
+      initialized = true;
+      board = document.getElementById('s2-board');
+      svg = document.getElementById('s2-svg');
+      buildCards();
+      window.addEventListener('resize', redrawAll);
+      var nextBtn = document.getElementById('s2-next');
+      if (nextBtn) nextBtn.addEventListener('click', function(){ showStage('3'); });
+
+      setupHints('s2-hint-btn', 's2-hint-area', [
+        '同じ文化圏・同じ性質を語る証拠同士を結べ。まずは『言語』と『漫画』',
+        '正解ペアの例: ①+③、②+⑤、④+⑤。あと2組ある(②+③、④+⑥)'
+      ]);
+    }
+    // 表示直後はレイアウトが確定してから座標を合わせ直す
+    requestAnimationFrame(redrawAll);
+  });
+})();
+</script>
+
+<script>
+(function(){
+  /* =========================================================
+     STAGE3 / STAGE4 / ENDING 共通ロジック
+     G / showStage / registerStage / flashScreen / elapsedString / EVIDENCE
+     は SHELL 側で定義済みのため再定義しない
+     ========================================================= */
+
+  /* ---------- STAGE3: 暗号解読 ---------- */
+  (function initStage3(){
+    var CIPHER = "WKH ILQDO NHB LV EXOOILJKWHU"; // 平文 "THE FINAL KEY IS BULLFIGHTER" をシフト+3で暗号化したもの
+    var ANSWER = "BULLFIGHTER";
+
+    var shiftInput   = document.getElementById('s3-shift');
+    var shiftVal     = document.getElementById('s3-shift-val');
+    var decodedEl    = document.getElementById('s3-decoded');
+    var keywordInput = document.getElementById('s3-keyword');
+    var submitBtn    = document.getElementById('s3-submit');
+    var messageEl    = document.getElementById('s3-message');
+    var successEl    = document.getElementById('s3-success');
+
+    var failCount = 0;
+    var solved = false;
+
+    // シーザー暗号を「シフト数」だけ逆方向にずらして復号する
+    function caesarDecode(text, shift){
+      return text.replace(/[A-Z]/g, function(ch){
+        var code = ch.charCodeAt(0) - 65;
+        var decoded = ((code - shift) % 26 + 26) % 26;
+        return String.fromCharCode(decoded + 65);
+      });
+    }
+
+    function updateDecoded(){
+      var shift = parseInt(shiftInput.value, 10) || 0;
+      shiftVal.textContent = shift;
+      decodedEl.textContent = caesarDecode(CIPHER, shift);
+    }
+
+    shiftInput.addEventListener('input', updateDecoded);
+    updateDecoded();
+
+    function checkAnswer(){
+      if(solved) return;
+      var raw = (keywordInput.value || '').trim().toUpperCase();
+      if(raw === ANSWER){
+        solved = true;
+        messageEl.textContent = '';
+        submitBtn.disabled = true;
+        successEl.style.display = 'block';
+        successEl.textContent = 'ACCESS GRANTED — KEY: BULLFIGHTER';
+        setTimeout(function(){ showStage('4'); }, 1000);
+      } else {
+        failCount++;
+        flashScreen();
+        messageEl.textContent = '不正解。もう一度シフト数と鍵を確認せよ。(失敗: ' + failCount + '回)';
+      }
+    }
+
+    submitBtn.addEventListener('click', checkAnswer);
+    keywordInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        checkAnswer();
+      }
+    });
+
+    setupHints('s3-hint-btn', 's3-hint-area', [
+      'シーザー暗号だ。スライダーを少しずつ動かして意味の通る英文を探せ',
+      'シフト数は 3。復号文の最後の単語が鍵だ'
+    ]);
+  })();
+
+  /* ---------- STAGE4: 動機の推理 ---------- */
+  (function initStage4(){
+    var summaryEl   = document.getElementById('s4-evidence-summary');
+    var memosEl     = document.getElementById('s4-memos');
+    var reviewBtn   = document.getElementById('s4-review-btn');
+    var modal       = document.getElementById('s4-modal');
+    var modalBody   = document.getElementById('s4-modal-body');
+    var modalClose  = document.getElementById('s4-modal-close');
+    var hypoCards   = document.querySelectorAll('.s4-hypo-card');
+    var decideBtn   = document.getElementById('s4-decide-btn');
+
+    var selectedKey = null;
+
+    // 証拠サマリー・推理メモを最新の状態で描画し直す(表示のたびに呼ばれる)
+    function renderSummary(){
+      summaryEl.innerHTML = EVIDENCE.map(function(e){
+        return '<span class="s4-ev-item"><span class="s4-ev-tag">' + e.tag + '</span>' + e.title + '</span>';
+      }).join('');
+
+      if(G.memos.length === 0){
+        memosEl.innerHTML = '<p class="s4-memo-empty">メモなし</p>';
+      } else {
+        memosEl.innerHTML = '<ul>' + G.memos.map(function(m){
+          return '<li>' + m + '</li>';
+        }).join('') + '</ul>';
+      }
+    }
+
+    // モーダルに証拠の全文を表示
+    function buildModalBody(){
+      modalBody.innerHTML = EVIDENCE.map(function(e){
+        return '<div class="s4-modal-ev"><h4>' + e.tag + ' — ' + e.title + '</h4><p>' + e.body + '</p></div>';
+      }).join('');
+    }
+
+    reviewBtn.addEventListener('click', function(){
+      buildModalBody();
+      modal.classList.add('open');
+    });
+    modalClose.addEventListener('click', function(){
+      modal.classList.remove('open');
+    });
+    // オーバーレイの背景クリックでも閉じる
+    modal.addEventListener('click', function(e){
+      if(e.target === modal){ modal.classList.remove('open'); }
+    });
+
+    hypoCards.forEach(function(card){
+      card.addEventListener('click', function(){
+        hypoCards.forEach(function(c){ c.classList.remove('selected'); });
+        card.classList.add('selected');
+        selectedKey = card.getAttribute('data-key');
+        decideBtn.disabled = false;
+      });
+    });
+
+    decideBtn.addEventListener('click', function(){
+      if(!selectedKey) return;
+      G.choice = selectedKey;
+      showStage('ending');
+    });
+
+    // registerStage: STAGE4 が表示されるたびに証拠サマリーとメモを再描画
+    registerStage('4', function(){
+      renderSummary();
+    });
+  })();
+
+  /* ---------- ENDING: ケースクローズ ---------- */
+  (function initEnding(){
+    var textEl     = document.getElementById('end-text');
+    var timeEl     = document.getElementById('end-time');
+    var restartBtn = document.getElementById('end-restart-btn');
+    var stampWrap  = document.getElementById('end-stamp-wrap');
+
+    var LABELS = {
+      nation:      '国家関与説',
+      mercenary:   '高級傭兵説',
+      independent: '単独ハッカー集団説'
+    };
+
+    // クリアタイムは ending 表示時に1回だけ確定させ、以後は再計算しない
+    var timeFixed = false;
+
+    var REPORTS = {
+      nation:
+        '通信ログに残されたスペイン語の痕跡、そして「Mafalda」という命名——これらは単なる偶然の意匠ではなく、特定の文化圏を背景に持つ組織的な作戦チームの存在を示唆している。標的が通信会社や大学、政府系機関など諜報的価値の高い組織に偏っていることも、国家の情報機関が背後で糸を引いているという見立てを補強する材料だ。何より、長期間にわたり検知を逃れ続けた技術力の高さと第三国インフラを介した周到な追跡妨害は、潤沢な予算と人材を持つ国家機関でなければ実現が難しい。本捜査チームは、Metadorの正体を特定国家の諜報機関、あるいはその強い関与のもとで運用される作戦チームであると結論づける。',
+      mercenary:
+        '被害組織に地理的にも業種的にも一貫性が見られないという事実は、思想や国益ではなく依頼に応じて標的を選ぶ「仕事人」の存在を物語っている。極めて高度な技術力と、身元を一切明かさない徹底した匿名性へのこだわりは、報酬次第でどの案件にも対応する高級傭兵集団の行動様式と一致する。スペイン語圏と英語圏、双方にまたがる文化的痕跡が同居している点も、多国籍のメンバーで構成された請負チームであれば無理なく説明がつく。本捜査チームは、Metadorの正体を金銭によって動く独立系の凄腕傭兵集団であると結論づける。',
+      independent:
+        '国家の後ろ盾を持たない民間集団であっても、これほどの技術力を持つグループは実在しうる。マルウェアに残された遊び心のある文化的痕跡——ポップパンクの歌詞やアルゼンチンの風刺漫画のキャラクター名——は、公式な国家機関の仕事というより、限られた仲間内だけで完結する趣味的な集団の痕跡のようにも見える。標的に一貫性がないことも、明確な国益や依頼主を持たず、自らの技術的探究心や挑戦のために攻撃を重ねていると考えれば説明がつく。本捜査チームは、Metadorの正体を国家とは無関係な、非常に高度な技術力を持つ独立系ハッカー集団であると結論づける。'
+    };
+
+    // アニメーションを毎回最初から再生するための再フロー処理
+    function replayStamp(){
+      stampWrap.classList.remove('end-stamp-anim');
+      void stampWrap.offsetWidth; // 強制リフロー
+      stampWrap.classList.add('end-stamp-anim');
+    }
+
+    registerStage('ending', function(){
+      var key = G.choice || 'independent';
+      var label = LABELS[key] || LABELS.independent;
+      var body = REPORTS[key] || REPORTS.independent;
+
+      textEl.innerHTML =
+        '<p class="end-lead">CASE CLOSED — 仮説: ' + label + '</p>' +
+        '<p>' + body + '</p>';
+
+      // クリアタイムは初回表示時にのみ elapsedString() を呼んで固定する
+      if(!timeFixed){
+        timeEl.textContent = '捜査時間: ' + elapsedString();
+        timeFixed = true;
+      }
+
+      replayStamp();
+    });
+
+    restartBtn.addEventListener('click', function(){
+      location.reload();
+    });
+  })();
+
+})();
+</script>
+</body>
+</html>
