@@ -1,0 +1,2257 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2036: フラグメント・プロトコル</title>
+<style>
+/* ==========================================================================
+   2036: フラグメント・プロトコル — Visual Design System
+   ダーク・ディストピア監視社会 UI キット
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;600;800&family=Share+Tech+Mono&display=swap');
+
+/* ==========================================================================
+   1. DESIGN TOKENS
+   ========================================================================== */
+
+:root {
+  /* ---- Base surfaces ---- */
+  --color-bg:            #0a0a0d;
+  --color-bg-alt:        #0f0f14;
+  --color-surface:       #131318;
+  --color-surface-raised:#1a1a21;
+  --color-border:        #2a2a33;
+  --color-border-strong: #3d3d49;
+
+  /* ---- Warning accents ---- */
+  --color-red-500:  #ff3b3b;
+  --color-red-400:  #ff6b5c;
+  --color-red-700:  #7a1414;
+  --color-red-glow: rgba(255, 59, 59, 0.55);
+
+  --color-amber-500:  #ffb020;
+  --color-amber-400:  #ffcf6b;
+  --color-amber-700:  #6b4a08;
+  --color-amber-glow: rgba(255, 176, 32, 0.45);
+
+  /* ---- CRT terminal accent (checkpoint log panel) ---- */
+  --color-crt-green:      #39ff6a;
+  --color-crt-green-dim:  #1f7a3b;
+  --color-crt-green-glow: rgba(57, 255, 106, 0.4);
+  --color-crt-amber:      var(--color-amber-500);
+  --color-crt-amber-dim:  var(--color-amber-700);
+  --color-crt-amber-glow: var(--color-amber-glow);
+
+  /* ---- Text ---- */
+  --color-text-primary:   #e9e7e1;
+  --color-text-secondary: #9a9aa1;
+  --color-text-muted:     #5c5c65;
+  --color-text-inverse:   #0a0a0d;
+
+  /* ---- Semantic (auth score) ---- */
+  --color-auth-danger:  var(--color-red-500);
+  --color-auth-warning: var(--color-amber-500);
+  --color-auth-safe:    var(--color-crt-green);
+
+  /* ---- Typography ---- */
+  --font-heading: 'Shippori Mincho B1', serif;
+  --font-mono:    'Share Tech Mono', 'Courier New', monospace;
+  --weight-heading: 800;
+
+  --fs-xs:   0.75rem;
+  --fs-sm:   0.875rem;
+  --fs-base: 1rem;
+  --fs-md:   1.125rem;
+  --fs-lg:   1.5rem;
+  --fs-xl:   2rem;
+  --fs-2xl:  2.75rem;
+  --fs-3xl:  3.75rem;
+
+  --lh-tight: 1.15;
+  --lh-normal: 1.6;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ---- Radius: mostly sharp / clipped, dystopian-terminal feel ---- */
+  --radius-none: 0;
+  --radius-sm:   2px;
+  --radius-md:   4px;
+
+  /* ---- Borders / lines ---- */
+  --border-hairline: 1px solid var(--color-border);
+  --border-strong:   1px solid var(--color-border-strong);
+
+  /* ---- Elevation / glow ---- */
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.6);
+  --glow-red:   0 0 8px var(--color-red-glow), 0 0 24px rgba(255, 59, 59, 0.2);
+  --glow-amber: 0 0 8px var(--color-amber-glow), 0 0 24px rgba(255, 176, 32, 0.2);
+  --glow-green: 0 0 8px var(--color-crt-green-glow), 0 0 24px rgba(57, 255, 106, 0.2);
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:   120ms;
+  --dur-normal: 240ms;
+  --dur-slow:   600ms;
+  --dur-stage:  900ms;
+
+  /* ---- Z-index scale ---- */
+  --z-base: 1;
+  --z-hud: 10;
+  --z-overlay: 100;
+  --z-noise: 200;
+}
+
+/* ==========================================================================
+   2. RESET / BASE
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .heading-mincho {
+  font-family: var(--font-heading);
+  font-weight: var(--weight-heading);
+  line-height: var(--lh-tight);
+  margin: 0 0 var(--space-4);
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary);
+}
+
+h1, .heading-xl { font-size: var(--fs-2xl); }
+h2, .heading-lg { font-size: var(--fs-xl); }
+h3, .heading-md { font-size: var(--fs-lg); }
+
+p, .text-body { font-family: var(--font-mono); }
+
+a { color: var(--color-amber-400); }
+
+/* ==========================================================================
+   3. GAME SHELL / LAYOUT
+   ========================================================================== */
+
+.game-root {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 176, 32, 0.06), transparent 60%),
+    radial-gradient(ellipse at 50% 110%, rgba(255, 59, 59, 0.05), transparent 60%),
+    var(--color-bg);
+  overflow-x: hidden;
+}
+
+.game-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-8);
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.hud {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-hud);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(10, 10, 13, 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: var(--border-hairline);
+}
+
+@media (max-width: 640px) {
+  .hud { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .game-container { padding: var(--space-4) var(--space-3) var(--space-6); }
+}
+
+/* ==========================================================================
+   4. STAGE PROGRESS BAR — "STAGE 2/5"
+   ========================================================================== */
+
+.stage-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.stage-progress__label {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.stage-progress__label .stage-progress__current {
+  color: var(--color-amber-400);
+  font-weight: 700;
+}
+
+.stage-progress__track {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  height: 6px;
+}
+
+.stage-progress__seg {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+}
+
+.stage-progress__seg--done {
+  background: var(--color-amber-500);
+  box-shadow: var(--glow-amber);
+  border-color: var(--color-amber-500);
+}
+
+.stage-progress__seg--current {
+  background: var(--color-red-500);
+  box-shadow: var(--glow-red);
+  border-color: var(--color-red-500);
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   5. AUTH SCORE GAUGE — 認証スコア
+   ========================================================================== */
+
+.auth-gauge {
+  border: var(--border-hairline);
+  background: var(--color-surface);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auth-gauge__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.auth-gauge__value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+
+.auth-gauge__bar {
+  position: relative;
+  height: 10px;
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-border-strong);
+  overflow: hidden;
+}
+
+.auth-gauge__fill {
+  height: 100%;
+  width: var(--auth-percent, 50%);
+  transition: width var(--dur-slow) var(--ease-standard), background-color var(--dur-slow);
+  background: var(--color-auth-warning);
+}
+
+/* State modifiers — apply to .auth-gauge */
+.auth-gauge--danger  .auth-gauge__fill,
+.auth-gauge--danger  .auth-gauge__value { background-color: var(--color-auth-danger); color: var(--color-auth-danger); }
+.auth-gauge--danger  .auth-gauge__bar   { box-shadow: inset 0 0 10px var(--color-red-glow); }
+.auth-gauge--danger  .auth-gauge__fill  { background: var(--color-auth-danger); box-shadow: var(--glow-red); }
+
+.auth-gauge--warning .auth-gauge__value { color: var(--color-auth-warning); }
+.auth-gauge--warning .auth-gauge__fill  { background: var(--color-auth-warning); box-shadow: var(--glow-amber); }
+
+.auth-gauge--safe    .auth-gauge__value { color: var(--color-auth-safe); }
+.auth-gauge--safe    .auth-gauge__fill  { background: var(--color-auth-safe); box-shadow: var(--glow-green); }
+
+/* ==========================================================================
+   6. CHECKPOINT TERMINAL LOG PANEL — CRT風
+   ========================================================================== */
+
+.terminal-panel {
+  position: relative;
+  background: #060907;
+  border: 1px solid var(--color-crt-green-dim);
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--color-crt-green);
+  box-shadow: var(--shadow-panel), inset 0 0 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+/* amber CRT variant */
+.terminal-panel--amber {
+  background: #0a0704;
+  border-color: var(--color-crt-amber-dim);
+  color: var(--color-crt-amber);
+}
+
+.terminal-panel__titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  border-bottom: 1px dashed currentColor;
+  opacity: 0.85;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.terminal-panel__body {
+  position: relative;
+  z-index: 1;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  text-shadow: 0 0 4px currentColor;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0;
+  animation: log-line-in var(--dur-normal) var(--ease-standard) forwards;
+}
+
+.log-line__timestamp {
+  color: var(--color-text-muted);
+  margin-right: var(--space-2);
+}
+
+.log-line--alert   { color: var(--color-red-400); }
+.log-line--warn    { color: var(--color-amber-400); }
+.log-line--system  { color: var(--color-text-secondary); }
+
+/* CRT scanline + flicker layered inside the panel itself */
+.terminal-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.05) 0px,
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+.terminal-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%);
+  animation: crt-flicker 5s infinite;
+}
+
+/* Typewriter cursor, for use inside log lines / dialogue text */
+.typewriter-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-cursor 1s steps(1) infinite;
+}
+
+/* ==========================================================================
+   7. CHOICE BUTTONS
+   ========================================================================== */
+
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.choice-btn {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: var(--border-hairline);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  position: relative;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              background-color var(--dur-fast) var(--ease-standard),
+              transform var(--dur-fast) var(--ease-standard);
+}
+
+.choice-btn::before {
+  content: "▸";
+  color: var(--color-amber-500);
+  margin-right: var(--space-2);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+.choice-btn:hover,
+.choice-btn:focus-visible {
+  border-color: var(--color-amber-500);
+  background: var(--color-surface-raised);
+  transform: translateX(2px);
+  outline: none;
+}
+
+.choice-btn:hover::before,
+.choice-btn:focus-visible::before { opacity: 1; }
+
+.choice-btn:active { transform: translateX(0); }
+
+.choice-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.choice-btn--danger:hover { border-color: var(--color-red-500); box-shadow: var(--glow-red); }
+.choice-btn--danger:hover::before { color: var(--color-red-500); }
+
+/* ==========================================================================
+   8. TEXT INPUT + 判定 (JUDGE) BUTTON
+   ========================================================================== */
+
+.input-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+  margin: var(--space-4) 0;
+}
+
+.terminal-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  color: var(--color-crt-green);
+  background: #060907;
+  border: 1px solid var(--color-crt-green-dim);
+  padding: var(--space-3);
+  caret-color: var(--color-crt-green);
+}
+
+.terminal-input::placeholder { color: var(--color-text-muted); }
+
+.terminal-input:focus {
+  outline: none;
+  border-color: var(--color-crt-green);
+  box-shadow: var(--glow-green);
+}
+
+.judge-btn {
+  font-family: var(--font-heading);
+  font-weight: var(--weight-heading);
+  font-size: var(--fs-base);
+  letter-spacing: 0.1em;
+  color: var(--color-text-inverse);
+  background: var(--color-amber-500);
+  border: 1px solid var(--color-amber-500);
+  padding: 0 var(--space-5);
+  cursor: pointer;
+  transition: background-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast);
+}
+
+.judge-btn:hover { background: var(--color-red-500); border-color: var(--color-red-500); box-shadow: var(--glow-red); }
+.judge-btn:active { transform: scale(0.97); }
+.judge-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+@media (max-width: 640px) {
+  .input-row { flex-direction: column; }
+  .judge-btn { padding: var(--space-3); }
+}
+
+/* ==========================================================================
+   9. GLITCH / NOISE EFFECTS
+   ========================================================================== */
+
+/* Apply to any short text element; requires data-text="<same text>" attribute */
+.glitch-text {
+  position: relative;
+  display: inline-block;
+  color: var(--color-text-primary);
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  overflow: hidden;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+.glitch-text::before {
+  color: var(--color-red-500);
+  animation: glitch-shift-1 2.4s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+  color: var(--color-amber-500);
+  animation: glitch-shift-2 2.1s infinite linear alternate-reverse;
+}
+
+/* Trigger class: add/remove via JS for a burst glitch (e.g. on wrong answer) */
+.glitch-burst {
+  animation: glitch-burst-shake 0.25s steps(2, end) 3;
+}
+
+/* Full-viewport static noise overlay */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-noise);
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: noise-shift 0.5s steps(3) infinite;
+}
+
+/* Scanline overlay — sits above content, below noise */
+.scanline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.scanline-overlay::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 120px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 176, 32, 0.05),
+    transparent
+  );
+  animation: scanline-sweep 6s linear infinite;
+}
+
+/* ==========================================================================
+   10. STAGE TRANSITION (fade)
+   ========================================================================== */
+
+.stage-view {
+  animation: stage-fade-in var(--dur-stage) var(--ease-standard) both;
+}
+
+.stage-view.is-leaving {
+  animation: stage-fade-out var(--dur-normal) var(--ease-standard) both;
+}
+
+/* ==========================================================================
+   11. KEYFRAMES
+   ========================================================================== */
+
+@keyframes blink-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes log-line-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes crt-flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97% { opacity: 0.85; }
+  98% { opacity: 1; }
+  99% { opacity: 0.92; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes glitch-shift-1 {
+  0%   { clip-path: inset(0 0 85% 0); transform: translate(-2px, -1px); }
+  20%  { clip-path: inset(20% 0 60% 0); transform: translate(2px, 1px); }
+  40%  { clip-path: inset(55% 0 20% 0); transform: translate(-1px, 2px); }
+  60%  { clip-path: inset(10% 0 70% 0); transform: translate(1px, -2px); }
+  80%  { clip-path: inset(70% 0 5% 0); transform: translate(-2px, 1px); }
+  100% { clip-path: inset(30% 0 40% 0); transform: translate(2px, -1px); }
+}
+
+@keyframes glitch-shift-2 {
+  0%   { clip-path: inset(65% 0 5% 0); transform: translate(2px, 1px); }
+  25%  { clip-path: inset(10% 0 75% 0); transform: translate(-2px, -1px); }
+  50%  { clip-path: inset(40% 0 35% 0); transform: translate(1px, 2px); }
+  75%  { clip-path: inset(5% 0 80% 0); transform: translate(-1px, -2px); }
+  100% { clip-path: inset(60% 0 15% 0); transform: translate(2px, 1px); }
+}
+
+@keyframes glitch-burst-shake {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-3px, 1px); }
+  50%  { transform: translate(3px, -1px); }
+  75%  { transform: translate(-2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes noise-shift {
+  0%   { transform: translate(0, 0); }
+  33%  { transform: translate(-2%, 1%); }
+  66%  { transform: translate(1%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes scanline-sweep {
+  0%   { top: -120px; }
+  100% { top: 100%; }
+}
+
+@keyframes stage-fade-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes stage-fade-out {
+  from { opacity: 1; transform: translateY(0); filter: blur(0); }
+  to   { opacity: 0; transform: translateY(-8px); filter: blur(4px); }
+}
+
+/* ==========================================================================
+   12. RESPONSIVE — narrow / mobile adjustments
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  :root {
+    --fs-2xl: 1.75rem;
+    --fs-xl: 1.375rem;
+    --fs-lg: 1.125rem;
+  }
+
+  .terminal-panel { padding: var(--space-3); font-size: var(--fs-xs); }
+  .terminal-panel__body { max-height: 240px; }
+  .choice-btn { padding: var(--space-3); font-size: var(--fs-xs); }
+  .auth-gauge { padding: var(--space-3); }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .glitch-text::before,
+  .glitch-text::after,
+  .terminal-panel::after,
+  .scanline-overlay::after,
+  .noise-overlay,
+  .stage-progress__seg--current,
+  .typewriter-cursor {
+    animation: none !important;
+  }
+  .stage-view, .stage-view.is-leaving { animation-duration: 1ms !important; }
+}
+
+/* ==========================================================================
+   13. ENGINE SUPPLEMENT — design.css に定義のないコンポーネント
+   (同じデザイントークンのみを使用。角丸・色は本体トークンに準拠)
+   ========================================================================== */
+
+.stage-heading { margin-bottom: var(--space-5); }
+
+.line-flow { display: flex; flex-direction: column; }
+
+.line {
+  margin: 0 0 var(--space-3);
+  animation: log-line-in var(--dur-normal) var(--ease-standard) both;
+}
+
+.line--narration { color: var(--color-text-primary); }
+
+.line--system {
+  color: var(--color-amber-400);
+  font-size: var(--fs-sm);
+  border-left: 2px solid var(--color-amber-700);
+  background: rgba(255, 176, 32, 0.06);
+  padding: var(--space-2) var(--space-3);
+}
+
+.chat-row {
+  display: flex;
+  margin: 0 0 var(--space-3);
+  animation: log-line-in var(--dur-normal) var(--ease-standard) both;
+}
+
+.chat-row--self { justify-content: flex-end; }
+.chat-row--friend { justify-content: flex-start; }
+
+.chat-bubble {
+  max-width: 78%;
+  border: var(--border-hairline);
+  background: var(--color-surface);
+  padding: var(--space-3);
+  font-size: var(--fs-sm);
+}
+
+.chat-bubble__speaker {
+  display: block;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.chat-row--self .chat-bubble { background: var(--color-surface-raised); border-color: var(--color-amber-700); }
+.chat-row--self .chat-bubble__speaker { color: var(--color-amber-400); text-align: right; }
+.chat-row--friend .chat-bubble__speaker { color: var(--color-text-secondary); }
+
+.puzzle-prompt {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  border-left: 2px solid var(--color-border-strong);
+  padding-left: var(--space-3);
+  margin: var(--space-5) 0 var(--space-4);
+}
+
+.choice-set-prompt {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  margin: var(--space-5) 0 var(--space-3);
+}
+
+.article-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.article-card {
+  border: var(--border-hairline);
+  background: var(--color-surface);
+  padding: var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.article-card h3 { font-size: var(--fs-md); margin-bottom: var(--space-1); }
+
+.article-card__source {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  margin-bottom: var(--space-3);
+}
+
+.article-card ul {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.puzzle-result-area { margin-top: var(--space-4); }
+
+.hint-text {
+  color: var(--color-amber-400);
+  border-left: 3px solid var(--color-amber-500);
+  background: rgba(255, 176, 32, 0.06);
+  padding: var(--space-2) var(--space-3);
+}
+
+.result-text--success {
+  color: var(--color-crt-green);
+  text-shadow: 0 0 6px var(--color-crt-green-glow);
+  border-left: 3px solid var(--color-crt-green);
+  background: rgba(57, 255, 106, 0.06);
+  padding: var(--space-2) var(--space-3);
+}
+
+.result-text--fail {
+  color: var(--color-red-400);
+  border-left: 3px solid var(--color-red-500);
+  background: rgba(255, 59, 59, 0.06);
+  padding: var(--space-2) var(--space-3);
+}
+
+.choice-btn.is-selected {
+  border-color: var(--color-crt-green);
+  background: var(--color-surface-raised);
+  box-shadow: var(--glow-green);
+}
+
+.choice-btn.is-selected::before {
+  content: "●";
+  color: var(--color-crt-green);
+  opacity: 1;
+}
+
+.slot-template {
+  font-family: var(--font-heading);
+  font-size: var(--fs-md);
+  line-height: 1.9;
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.slot-blank {
+  display: inline-block;
+  min-width: 6em;
+  border-bottom: 2px solid var(--color-amber-500);
+  text-align: center;
+  color: var(--color-amber-400);
+  padding: 0 var(--space-1);
+}
+
+.slot-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.slot-group__label {
+  display: block;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.ending-blackout {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.ending-blackout.is-active { opacity: 1; }
+
+.ending-final {
+  position: fixed;
+  inset: 0;
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.ending-final.is-visible { opacity: 1; }
+
+.ending-final__line {
+  font-family: var(--font-heading);
+  font-weight: var(--weight-heading);
+  font-size: var(--fs-lg);
+  max-width: 600px;
+  color: var(--color-text-primary);
+}
+
+.ending-final__note {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  max-width: 520px;
+  line-height: var(--lh-normal);
+}
+
+@media (max-width: 640px) {
+  .article-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line, .chat-row { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="game-root">
+  <div class="scanline-overlay"></div>
+  <div class="noise-overlay"></div>
+
+  <header class="hud" id="hud">
+    <div class="stage-progress">
+      <div class="stage-progress__label">
+        <span>STAGE <span class="stage-progress__current" id="stageCurrent">0</span>/5</span>
+        <span id="gameTitle">2036: フラグメント・プロトコル</span>
+      </div>
+      <div class="stage-progress__track" id="stageTrack"></div>
+    </div>
+    <div class="auth-gauge auth-gauge--danger" id="authGauge">
+      <div class="auth-gauge__header">
+        <span>AUTH SCORE</span>
+        <span class="auth-gauge__value" id="authValue">0%</span>
+      </div>
+      <div class="auth-gauge__bar">
+        <div class="auth-gauge__fill" id="authFill" style="--auth-percent: 0%;"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="game-container" id="stageContainer"></main>
+</div>
+
+<script>
+// 2036: フラグメント・プロトコル
+// シナリオ・謎データ（純データ / ロジックなし）
+// ※本作品は2026年時点の地経学・AIリスクに関する報道を基にした独自仮説であり、実在の予測・公式見解ではありません。
+
+const GAME_DATA = {
+  meta: {
+    title: "2036: フラグメント・プロトコル",
+    subtitle: "改変されていない事実を、取り戻せ。",
+    footerNote:
+      "※本作品は2026年時点の地経学・AIリスクに関する報道を基にした独自仮説であり、実在の予測・公式見解ではありません。",
+  },
+
+  // ============================================================
+  // STAGE 0: プロローグ「目覚め」
+  // ============================================================
+  stage0: {
+    id: "stage0",
+    title: "プロローグ ―― 目覚め",
+    lines: [
+      { type: "narration", text: "目を開けると、見知らぬ天井が見えた。" },
+      {
+        type: "narration",
+        text: "記憶をたどる。昨夜、大学のレポートを提出してベッドに入った――そこまでは、はっきり覚えている。",
+      },
+      {
+        type: "narration",
+        text: "ここはどこだ。自分の部屋じゃない。壁紙も、天井の照明も、何もかもが違う。",
+      },
+      {
+        type: "narration",
+        text: "手探りでポケットを探ると、指先に見慣れた感触が触れた。スマートフォンだ。",
+      },
+      { type: "system", text: "[ロック画面] 2036年7月3日(金) 03:47" },
+      {
+        type: "system",
+        text: "[通知] 認証スコア：未確認 ―― すべてのアプリのアイコンに、赤い警告マークが点滅している。",
+      },
+      {
+        type: "narration",
+        text: "日付の表示だけが、やけにくっきりと正常に見えた。2036年。10年後の日付。",
+      },
+      {
+        type: "narration",
+        text: "窓の外はまだ暗い。息を整え、次にとる行動を決めなければならない。",
+      },
+    ],
+    choices: [
+      {
+        id: "go_outside",
+        label: "すぐ外に出る",
+        reaction: [
+          {
+            type: "narration",
+            text: "スマホをポケットに戻し、ドアに手をかける。とにかく状況を自分の目で確かめたかった。",
+          },
+          {
+            type: "narration",
+            text: "廊下は静まり返っていた。見覚えのある間取りのはずなのに、壁に貼られた案内表示の書体も色も、記憶にあるものと違う。",
+          },
+          {
+            type: "narration",
+            text: "外へ出ると、街の輪郭はほとんど変わっていないのに、掲げられている広告や標識の文字だけが、まるごと差し替えられているように見えた。",
+          },
+          {
+            type: "narration",
+            text: "何かが、根本から変わってしまっている。そう確信しながら、ポケットの中でスマホが振動するのを感じた。",
+          },
+        ],
+      },
+      {
+        id: "check_phone",
+        label: "スマホを調べる",
+        reaction: [
+          {
+            type: "narration",
+            text: "その場に座り込み、震える指でロックを解除する。ホーム画面に並ぶアプリは、見たことのないものばかりだった。",
+          },
+          {
+            type: "system",
+            text: "[設定 > 端末情報] 所属認証圏：未設定 ／ 事実認証AI連携：オフライン",
+          },
+          {
+            type: "narration",
+            text: "『所属認証圏』という項目に見覚えはない。だが空欄になっていることが、なぜか強い違和感として胸に残った。",
+          },
+          {
+            type: "narration",
+            text: "ニュースアプリを開こうとした瞬間、通知が一件飛び込んできた。差出人は――10年前、毎日のように話していた友人の名前だった。",
+          },
+        ],
+      },
+    ],
+    next: "stage1",
+  },
+
+  // ============================================================
+  // STAGE 1: 情報の壁
+  // ============================================================
+  stage1: {
+    id: "stage1",
+    title: "第1章 ―― 情報の壁",
+    lines: [
+      {
+        type: "narration",
+        text: "SNSを開くと、タイムラインは知らないニュースで埋め尽くされていた。見出しの半分は、意味がわからない固有名詞ばかりだ。",
+      },
+      {
+        type: "narration",
+        text: "そんな中、旧友「ケンジ」からのメッセージ通知に気づく。10年前と同じアイコン、同じ口調。迷わずタップした。",
+      },
+      { type: "chat_self", speaker: "自分", text: "ケンジ、久しぶり。今どこにいる？ 何が起きてるのか教えてくれ。" },
+      {
+        type: "chat_friend",
+        speaker: "ケンジ",
+        text: "は？ お前、誰のアカウント使ってんの。10年前の喋り方すんな、通報されるぞ。",
+      },
+      { type: "chat_self", speaker: "自分", text: "本当に俺だよ。7月3日に湾岸新都心で停電があったって記事、見た？" },
+      {
+        type: "chat_friend",
+        speaker: "ケンジ",
+        text: "湾岸新都心の停電はサイバー攻撃だって認証AIが確定させてる。お前の言ってることはフェイクだろ。どのAI使ってんだ？",
+      },
+      {
+        type: "chat_friend",
+        speaker: "ケンジ",
+        text: "……いや待て。俺のAIとお前の言い分、根本から食い違ってる。お前、どのブロックの端末使ってる？",
+      },
+      {
+        type: "narration",
+        text: "会話はそこで途切れた。動揺したまま端末のログを遡ると、聞き慣れない専門用語が目に入る。",
+      },
+      {
+        type: "terminal",
+        text: "[システムログ] 個人最適化情報スウォーム：稼働中 ―― ユーザーの認証圏・閲覧履歴・感情反応に応じ、同一事象について異なる説明を自動生成・配信しています。",
+      },
+      {
+        type: "narration",
+        text: "つまり、自分とケンジは同じ出来事について、まったく別の「事実」を見せられているということだ。",
+      },
+      {
+        type: "narration",
+        text: "気になった停電のニュースを検索すると、正反対の内容を報じる2本の記事が見つかった。読み比べれば、何か手がかりがあるかもしれない。",
+      },
+    ],
+    puzzle: {
+      id: "puzzle1_common_sentence",
+      type: "select-common-sentence",
+      prompt:
+        "2本の記事は同じ出来事を正反対に説明している。だが、よく読むと一字一句まったく同じ文が1つだけ紛れ込んでいる。それを選べ。",
+      articles: [
+        {
+          id: "article_a",
+          title: "湾岸新都心、大規模停電 ―― サイバー侵入の痕跡",
+          source: "事実認証AI「TrueLine」（米国圏ブロック）",
+          sentences: [
+            "7月3日未明、湾岸新都心エリアで大規模停電が発生した。",
+            "復旧までに14時間を要し、約230万世帯が影響を受けた。",
+            "TrueLine認証部は、原因を中国圏ブロックによる送電網へのサイバー侵入と断定した。",
+            "現地当局は数週間前から、送電制御システムに不審な通信パターンを検知していたと発表している。",
+            "グローバルサウス圏メディアはこの見解を「根拠不十分」と批判している。",
+            "政府筋は、再発防止のため送電網の陣営分離をさらに加速する方針だと述べた。",
+          ],
+        },
+        {
+          id: "article_b",
+          title: "湾岸新都心停電、真因は老朽インフラ ―― 責任転嫁の懸念",
+          source: "事実認証AI「清源」（中国圏ブロック）",
+          sentences: [
+            "7月3日未明、湾岸新都心エリアで大規模停電が発生した。",
+            "復旧までにおよそ14時間を要し、230万世帯以上が影響を受けたとみられる。",
+            "清源認証部の分析によれば、原因は老朽化した送電設備の経年劣化である。",
+            "現地当局は、米国圏ブロックがこの事故を世論誘導に利用しようとしていると非難した。",
+            "米国圏メディアはこの見解を「責任転嫁」と批判している。",
+            "政府筋は、老朽インフラの更新計画を前倒しする方針だと述べた。",
+          ],
+        },
+      ],
+      options: [
+        { id: "opt1", text: "7月3日未明、湾岸新都心エリアで大規模停電が発生した。" },
+        { id: "opt2", text: "原因は中国圏ブロックによる送電網へのサイバー侵入である。" },
+        { id: "opt3", text: "原因は老朽化した送電設備の経年劣化である。" },
+        { id: "opt4", text: "復旧までに14時間を要し、約230万世帯が影響を受けた。" },
+        { id: "opt5", text: "米国圏ブロックが世論誘導を図ろうとしている。" },
+        { id: "opt6", text: "現地当局は数週間前から不審な通信パターンを検知していた。" },
+      ],
+      answer: "opt1",
+      hints: [
+        "原因や責任の説明は、記事ごとに正反対になっている。そこに答えはない。",
+        "数字や分量を含む文は、記事によって微妙に言い回しが変えられている場合がある。一字一句同じかどうか、注意深く見比えよう。",
+        "「いつ・どこで・何が起きたか」という最も基本的な一文だけは、両陣営とも改変できなかった。",
+      ],
+      successText:
+        "端末に緑色の認証マークが灯る。「7月3日未明、湾岸新都心エリアで大規模停電が発生した」――解釈も責任の所在もすべて食い違う2本の記事の中で、この一文だけが、どちらの認証AIも書き換えられなかった核だった。断片①〈共通の一文〉を入手した。",
+      failText:
+        "選んだ文には、記事ごとの「解釈」や「主張」が紛れ込んでいる。改変されていないのは、誰の立場にも属さない、最も乾いた事実の記述だけだ。もう一度、2本の記事を見比べてみよう。",
+    },
+    next: "stage2",
+  },
+
+  // ============================================================
+  // STAGE 2: テクノロジー国境線
+  // ============================================================
+  stage2: {
+    id: "stage2",
+    title: "第2章 ―― テクノロジー国境線",
+    lines: [
+      {
+        type: "narration",
+        text: "湾岸新都心の断片を手に、実家のある内陸エリアへ向かおうとしたところで、道が金属ゲートで塞がれているのに気づいた。",
+      },
+      {
+        type: "terminal",
+        text: "[検問AI] 通行判定を開始します。端末OS陣営を照合中……",
+      },
+      {
+        type: "narration",
+        text: "頭上のモニターに、自分のスマホの情報が映し出される。OSも、認証圏も、どちらの陣営にも登録されていない「不明」の表示。",
+      },
+      {
+        type: "system",
+        text: "[検問AI] 所属認証圏：不明 ―― 通行許可エリアを判定できません。手動照合モードに移行します。",
+      },
+      {
+        type: "narration",
+        text: "焦って、別のネットワーク経由でこの状況を誰かに知らせようと、越境した通信を試みる。",
+      },
+      {
+        type: "system",
+        text: "[検問AI] 越境通信を検知 ―― 陣営間ネットワークをまたぐ通信パターンは、サイバー攻撃の予兆として扱われます。追跡プロセスを起動します。",
+      },
+      {
+        type: "narration",
+        text: "背後のカメラ群が一斉にこちらへ向き直る音がした。逃げ場はない。ゲート脇の作業端末に、検問AIの内部ログが表示されたままになっているのが目に入る。",
+      },
+      {
+        type: "terminal",
+        text: "[検問AI 運用ログ] 本システムの経路解析モジュールは、2010年代に猛威を振るったとされる某国家系脅威アクターの通信秘匿技法を参考に設計されている。",
+      },
+      {
+        type: "terminal",
+        text: "[検問AI 運用ログ] 皮肉なことに、その技法の核は驚くほど原始的だった。アルファベットを一定数だけずらすだけの、紀元前から知られる暗号法と大差ない。",
+      },
+      {
+        type: "terminal",
+        text: "[DEBUG] cipher_module.shift = 3 // 旧式のシーザー式オフセット。仕様変更禁止。",
+      },
+      {
+        type: "narration",
+        text: "作業端末のログの奥に、傍受されたとおぼしき短い通行コードが記録されているのを見つけた。",
+      },
+      { type: "system", text: "[傍受データ] JDWHZDB" },
+      {
+        type: "narration",
+        text: "ずらし幅が3だとするなら――解読できれば、正規の通行者として扱われるかもしれない。",
+      },
+    ],
+    puzzle: {
+      id: "puzzle2_caesar_cipher",
+      type: "text-input-cipher",
+      prompt:
+        "傍受された通行コード「JDWHZDB」はシーザー暗号（大文字英字のみ、一定方向に一定数シフト）で作られている。運用ログのデバッグ表示によれば、シフト数は3。元の単語を答えよ。",
+      cipherText: "JDWHZDB",
+      shift: 3,
+      answer: "GATEWAY",
+      caseSensitive: false,
+      hints: [
+        "[DEBUG] cipher_module.shift = 3 という表示を思い出そう。暗号文の各文字を、アルファベット順で3つ手前に戻せば元の文字になる。",
+        "J→G、D→A、W→T……のように、1文字ずつアルファベット順を逆にたどってずらしていこう。",
+        "答えは検問＝「門」に関係する、意味の通った英単語1語になる。",
+      ],
+      successText:
+        "端末に入力すると、ゲート脇のランプが赤から青へ切り替わった。「GATEWAY」――解読された瞬間、検問AIの追跡プロセスが停止する。断片②〈通行コード〉を入手した。ゲートが静かに開いていく。",
+      failText:
+        "ゲートは反応しない。シフト数3を使い、暗号文の1文字ずつをアルファベット順で3つ手前に戻してみよう。",
+    },
+    next: "stage3",
+  },
+
+  // ============================================================
+  // STAGE 3: 家族の分断
+  // ============================================================
+  stage3: {
+    id: "stage3",
+    title: "第3章 ―― 家族の分断",
+    lines: [
+      {
+        type: "narration",
+        text: "ゲートを抜け、記憶を頼りに実家までたどり着く。呼び鈴を押すと、10年分老けた母が、警戒した顔でドアを開けた。",
+      },
+      {
+        type: "narration",
+        text: "父も妹も居間に集まってくる。だが誰も、心から歓迎している様子ではなかった。戸惑いと、わずかな怯えが入り混じった空気が漂っている。",
+      },
+      {
+        type: "narration",
+        text: "家族三人は、それぞれ違う端末を使っているらしい。テーブルの上には、陣営の異なる3台のデバイスが並んでいた。",
+      },
+    ],
+    choiceSets: [
+      {
+        id: "convo1_disappearance",
+        prompt: "「この10年、自分がどこで何をしていたことになっているのか」――誰に聞くか選ぶ。",
+        choices: [
+          {
+            id: "ask_mother",
+            label: "母に理由を聞く",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "母",
+                text: "あなた、グローバルサウス圏のNGOに参加して、そのまま音信不通になったのよ……私のAIはそう記録してる。",
+              },
+              {
+                type: "narration",
+                text: "母は今にも泣き出しそうな顔で、それでも信じ切れていない目をこちらに向けていた。",
+              },
+            ],
+          },
+          {
+            id: "ask_father",
+            label: "父に理由を聞く",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "父",
+                text: "俺のAIの記録じゃ、お前は中国圏ブロックにスカウトされて渡って、監視対象になってるらしいな。",
+              },
+              {
+                type: "narration",
+                text: "父は腕を組んだまま、まだこちらを値踏みするような視線を崩さなかった。",
+              },
+            ],
+          },
+          {
+            id: "ask_sister",
+            label: "妹に理由を聞く",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "妹",
+                text: "お兄ちゃんは長期入院してて、記憶障害があるって記録になってるよ。私のAI、南方主権系のやつだけど。",
+              },
+              {
+                type: "narration",
+                text: "妹だけは、他の二人よりわずかに柔らかい声でそう言った。",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: "convo2_how_to_answer",
+        prompt: "家族に、本当のことをどう伝えるか選ぶ。",
+        choices: [
+          {
+            id: "tell_truth",
+            label: "本当のことを話す（タイムリープしたと伝える）",
+            response: [
+              {
+                type: "narration",
+                text: "正直に話すと、三人はしばらく黙り込み、それから困惑した表情を浮かべた。誰も頭ごなしに否定はしなかった。",
+              },
+            ],
+          },
+          {
+            id: "go_along",
+            label: "家族の話に合わせておく",
+            response: [
+              {
+                type: "narration",
+                text: "話を合わせると、家族の肩からわずかに力が抜けるのがわかった。安堵と、それでも拭えない違和感が同居する空気だった。",
+              },
+            ],
+          },
+          {
+            id: "stay_silent",
+            label: "何も言わず黙っている",
+            response: [
+              {
+                type: "narration",
+                text: "沈黙が続くと、誰かが気まずそうに視線を逸らした。答えを迫らない優しさなのか、諦めなのかはわからなかった。",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: "convo3_shared_memory",
+        prompt: "「2026年のあの日のこと、覚えてる？」――誰に切り出すか選ぶ。",
+        choices: [
+          {
+            id: "ask_mother_memory",
+            label: "母に切り出す",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "母",
+                text: "覚えてるわよ。あなたの誕生日、妹がケーキを運ぼうとして転んで、生クリームが天井まで飛んだの。",
+              },
+            ],
+          },
+          {
+            id: "ask_father_memory",
+            label: "父に切り出す",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "父",
+                text: "あの日か。忘れるわけない。ケーキが宙を舞って、お前の顔面に着地したんだったな。",
+              },
+            ],
+          },
+          {
+            id: "ask_sister_memory",
+            label: "妹に切り出す",
+            response: [
+              {
+                type: "chat_friend",
+                speaker: "妹",
+                text: "あー、私がケーキ落とした日でしょ。お兄ちゃんの誕生日会。あれは一生消えないやつ。",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    lines_after: [
+      {
+        type: "narration",
+        text: "所属する認証圏も、使っているAIも、家族三人はバラバラだった。だが、この記憶――妹がケーキを落とした誕生日会――についてだけは、誰の証言も寸分違わず一致していた。",
+      },
+      {
+        type: "system",
+        text: "断片③〈家族の記憶：妹の誕生日会〉を入手した。",
+      },
+    ],
+    next: "stage4",
+  },
+
+  // ============================================================
+  // STAGE 4: 断片の統合
+  // ============================================================
+  stage4: {
+    id: "stage4",
+    title: "第4章 ―― 断片の統合",
+    lines: [
+      {
+        type: "narration",
+        text: "実家の書斎に、旧時代の据え置き端末を見つけた。ネットワークから切り離された、陣営に属さない装置だ。",
+      },
+      {
+        type: "terminal",
+        text: "[統合端末] 3つの断片を検出しました。照合し、改変されていない核となる事実を再構築します。",
+      },
+      {
+        type: "narration",
+        text: "画面には、空欄が3つ残された一文が表示されている。それぞれの空欄に、正しい断片から導かれる言葉をはめ込まなければならない。",
+      },
+    ],
+    puzzle: {
+      id: "puzzle4_reconstruction",
+      type: "triple-slot-combination",
+      prompt:
+        "3つの断片（①共通の一文／②通行コード／③家族の記憶）をもとに、各スロットに正しい言葉を選んで「核となる事実」の一文を完成させよ。",
+      template:
+        "____ で確かに起きたことは、事実だった。そこへ至る扉は『 ____ 』という言葉で開いた。そして、誰の記憶の中でも変わらなかったのは ____ だ。",
+      slots: [
+        {
+          id: "slot1",
+          fromFragment: "断片①（共通の一文）",
+          options: [
+            { id: "s1_a", text: "湾岸新都心" },
+            { id: "s1_b", text: "首都圏西部" },
+            { id: "s1_c", text: "国境検問所" },
+          ],
+          correct: "s1_a",
+        },
+        {
+          id: "slot2",
+          fromFragment: "断片②（通行コード）",
+          options: [
+            { id: "s2_a", text: "FIREWALL" },
+            { id: "s2_b", text: "GATEWAY" },
+            { id: "s2_c", text: "PROTOCOL" },
+          ],
+          correct: "s2_b",
+        },
+        {
+          id: "slot3",
+          fromFragment: "断片③（家族の記憶）",
+          options: [
+            { id: "s3_a", text: "父の送別会" },
+            { id: "s3_b", text: "母の退院祝い" },
+            { id: "s3_c", text: "妹の誕生日会" },
+          ],
+          correct: "s3_c",
+        },
+      ],
+      correctCombination: ["s1_a", "s2_b", "s3_c"],
+      hints: [
+        "スロット1は、記事の解釈ではなく2本の記事に一字一句同じ形で残っていた地名を思い出そう。",
+        "スロット2は、検問ゲートで解読したシーザー暗号の答えそのものだ。",
+        "スロット3は、母・父・妹の証言が全員一致していた出来事を思い出そう。",
+      ],
+      wrongText:
+        "画面が赤く点滅し、認証スコアが下がる。[認証スコア -1] 統合端末は「一部の断片が、陣営の解釈と混同されている」と警告している。断片そのものに立ち返り、選び直そう。",
+      successText:
+        "3つの空欄が同時に緑色へ変わり、一文が完成する。「湾岸新都心で確かに起きたことは、事実だった。そこへ至る扉は『GATEWAY』という言葉で開いた。そして、誰の記憶の中でも変わらなかったのは妹の誕生日会だ。」画面の向こうで、何かが静かに繋がる感覚があった。",
+    },
+    next: "stage5",
+  },
+
+  // ============================================================
+  // STAGE 5: エンディング
+  // ============================================================
+  stage5: {
+    id: "stage5",
+    title: "終章 ―― 2026年、今なら",
+    lines: [
+      {
+        type: "narration",
+        text: "統合端末の画面が白く発光する。視界が滲み、床の感触が消えていく。",
+      },
+      {
+        type: "narration",
+        text: "分断していたのは、米国圏でも、中国圏でも、グローバルサウス圏でもなかったのかもしれない。",
+      },
+      {
+        type: "narration",
+        text: "国家や陣営という大きな単位の前に、分断はもっと小さな場所――一人ひとりの認識の中に、静かに巣くっていた。",
+      },
+      {
+        type: "narration",
+        text: "母の記憶、父の記憶、妹の記憶。それぞれが違う「事実」を信じながらも、ただ一つ、誰も書き換えられなかった記憶があった。",
+      },
+      { type: "system", text: "[統合端末] 再構築完了。時刻同期を開始します……" },
+      {
+        type: "narration",
+        text: "気づくと、見慣れた自分の部屋の天井があった。スマホの日付を確認する手が震える。本当に戻れたのか、それとも、ここもまた誰かの「事実」の中なのか――確信は持てなかった。",
+      },
+      { type: "narration", text: "それでも、確かなことが一つだけある。" },
+      {
+        type: "narration",
+        text: "まだ、共有できる事実は残っている。2026年の、今なら。",
+      },
+    ],
+    footerNote:
+      "※本作品は2026年時点の地経学・AIリスクに関する報道を基にした独自仮説であり、実在の予測・公式見解ではありません。",
+  },
+};
+// ============================================================
+// 2036: フラグメント・プロトコル — ゲームエンジン (vanilla JS)
+// GAME_DATA (scenario.js) を読み込んで実行する。
+// ============================================================
+
+(function () {
+  "use strict";
+
+  var REDUCE_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var TYPE_SPEED = 24; // ms / 文字
+  var INITIAL_AUTH = 24; // 演出用に低め
+
+  var STAGE_TOTAL = 5;
+
+  var state = {
+    stageNumber: 0,
+    fragments: [],
+    auth: 0,
+  };
+
+  var currentView = null;
+  var clickResolve = null;
+  var isTypingNow = false;
+  var skipRequested = false;
+
+  // ------------------------------------------------------------
+  // ユーティリティ
+  // ------------------------------------------------------------
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function scrollToBottom() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
+  function onGlobalClick() {
+    if (isTypingNow) {
+      skipRequested = true;
+      return;
+    }
+    if (clickResolve) {
+      var r = clickResolve;
+      clickResolve = null;
+      r();
+    }
+  }
+
+  function waitForAdvance() {
+    return new Promise(function (resolve) {
+      clickResolve = resolve;
+    });
+  }
+
+  function typeText(el, text) {
+    return new Promise(function (resolve) {
+      if (REDUCE_MOTION) {
+        el.textContent = text;
+        isTypingNow = false;
+        resolve();
+        return;
+      }
+      isTypingNow = true;
+      skipRequested = false;
+      var i = 0;
+      var done = false;
+      var cursor = document.createElement("span");
+      cursor.className = "typewriter-cursor";
+
+      function render() {
+        el.textContent = text.slice(0, i);
+        el.appendChild(cursor);
+      }
+
+      function finish() {
+        if (done) return;
+        done = true;
+        el.textContent = text;
+        isTypingNow = false;
+        resolve();
+      }
+
+      function step() {
+        if (done) return;
+        if (skipRequested) {
+          finish();
+          return;
+        }
+        i++;
+        render();
+        if (i >= text.length) {
+          finish();
+          return;
+        }
+        setTimeout(step, TYPE_SPEED);
+      }
+
+      render();
+      setTimeout(step, TYPE_SPEED);
+    });
+  }
+
+  function glitchBurst(el) {
+    if (!el) return;
+    el.classList.remove("glitch-burst");
+    // reflow を挟んで再トリガーできるようにする
+    void el.offsetWidth;
+    el.classList.add("glitch-burst");
+    setTimeout(function () {
+      el.classList.remove("glitch-burst");
+    }, 800);
+  }
+
+  // ------------------------------------------------------------
+  // HUD (ステージ進捗 / 認証スコア)
+  // ------------------------------------------------------------
+
+  function renderHud(n) {
+    state.stageNumber = n;
+    var currentSpan = document.getElementById("stageCurrent");
+    currentSpan.textContent = String(n);
+    var track = document.getElementById("stageTrack");
+    track.innerHTML = "";
+    for (var i = 1; i <= STAGE_TOTAL; i++) {
+      var seg = document.createElement("div");
+      seg.className = "stage-progress__seg";
+      if (i < n) {
+        seg.classList.add("stage-progress__seg--done");
+      } else if (i === n) {
+        seg.classList.add("stage-progress__seg--current");
+      }
+      track.appendChild(seg);
+    }
+    glitchBurst(document.getElementById("hud"));
+  }
+
+  function setAuth(value) {
+    state.auth = Math.max(0, Math.min(100, Math.round(value)));
+    var gauge = document.getElementById("authGauge");
+    var fill = document.getElementById("authFill");
+    var val = document.getElementById("authValue");
+    gauge.classList.remove("auth-gauge--danger", "auth-gauge--warning", "auth-gauge--safe");
+    var cls = "auth-gauge--danger";
+    if (state.auth >= 67) {
+      cls = "auth-gauge--safe";
+    } else if (state.auth >= 34) {
+      cls = "auth-gauge--warning";
+    }
+    gauge.classList.add(cls);
+    fill.style.setProperty("--auth-percent", state.auth + "%");
+    val.textContent = state.auth + "%";
+  }
+
+  function adjustAuth(delta) {
+    setAuth(state.auth + delta);
+  }
+
+  // ------------------------------------------------------------
+  // 行表示 (タイプライター)
+  // ------------------------------------------------------------
+
+  function getOrCreateTerminalPanel(container) {
+    var panel = container.querySelector(":scope > .terminal-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.className = "terminal-panel";
+      var titlebar = document.createElement("div");
+      titlebar.className = "terminal-panel__titlebar";
+      var t1 = document.createElement("span");
+      t1.textContent = "SYSTEM LOG";
+      var t2 = document.createElement("span");
+      t2.textContent = "TRACE";
+      titlebar.appendChild(t1);
+      titlebar.appendChild(t2);
+      var body = document.createElement("div");
+      body.className = "terminal-panel__body";
+      panel.appendChild(titlebar);
+      panel.appendChild(body);
+      container.appendChild(panel);
+      scrollToBottom();
+    }
+    return panel.querySelector(".terminal-panel__body");
+  }
+
+  function buildLineElement(line, container) {
+    if (line.type === "terminal") {
+      var body = getOrCreateTerminalPanel(container);
+      var p = document.createElement("p");
+      p.className = /DEBUG/.test(line.text) ? "log-line log-line--warn" : "log-line log-line--system";
+      body.appendChild(p);
+      body.scrollTop = body.scrollHeight;
+      return { textTarget: p };
+    }
+    if (line.type === "chat_self" || line.type === "chat_friend") {
+      var row = document.createElement("div");
+      row.className = "chat-row " + (line.type === "chat_self" ? "chat-row--self" : "chat-row--friend");
+      var bubble = document.createElement("div");
+      bubble.className = "chat-bubble";
+      var speaker = document.createElement("span");
+      speaker.className = "chat-bubble__speaker";
+      speaker.textContent = line.speaker || "";
+      var textEl = document.createElement("span");
+      textEl.className = "chat-bubble__text";
+      bubble.appendChild(speaker);
+      bubble.appendChild(textEl);
+      row.appendChild(bubble);
+      container.appendChild(row);
+      scrollToBottom();
+      return { textTarget: textEl };
+    }
+    var pEl = document.createElement("p");
+    pEl.className = line.type === "system" ? "line line--system" : "line line--narration";
+    container.appendChild(pEl);
+    scrollToBottom();
+    return { textTarget: pEl };
+  }
+
+  async function runLines(lines, container) {
+    for (var i = 0; i < lines.length; i++) {
+      var built = buildLineElement(lines[i], container);
+      await typeText(built.textTarget, lines[i].text);
+      await waitForAdvance();
+    }
+  }
+
+  async function showMessage(container, text, cls) {
+    var p = document.createElement("p");
+    p.className = cls;
+    container.appendChild(p);
+    scrollToBottom();
+    await typeText(p, text);
+    await waitForAdvance();
+    return p;
+  }
+
+  // ------------------------------------------------------------
+  // 画面構築ヘルパー
+  // ------------------------------------------------------------
+
+  function buildHeading(title) {
+    var h = document.createElement("h2");
+    h.className = "glitch-text stage-heading";
+    h.setAttribute("data-text", title);
+    h.textContent = title;
+    return h;
+  }
+
+  async function newStageView() {
+    var container = document.getElementById("stageContainer");
+    if (currentView) {
+      currentView.classList.add("is-leaving");
+      await sleep(REDUCE_MOTION ? 1 : 260);
+      currentView.remove();
+      currentView = null;
+    }
+    var view = document.createElement("section");
+    view.className = "stage-view";
+    container.appendChild(view);
+    currentView = view;
+    window.scrollTo(0, 0);
+    return view;
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 0: プロローグ
+  // ------------------------------------------------------------
+
+  async function playStage0() {
+    setAuth(INITIAL_AUTH);
+    renderHud(0);
+    var data = GAME_DATA.stage0;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+
+    await new Promise(function (resolve) {
+      var list = document.createElement("div");
+      list.className = "choice-list";
+      view.appendChild(list);
+      var resolved = false;
+      data.choices.forEach(function (choice) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice-btn";
+        btn.textContent = choice.label;
+        btn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          if (resolved) return;
+          resolved = true;
+          Array.prototype.forEach.call(list.children, function (b) {
+            b.disabled = true;
+          });
+          await runLines(choice.reaction, flow);
+          resolve();
+        });
+        list.appendChild(btn);
+      });
+    });
+
+    await goToStage(data.next);
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 1: 情報の壁 (記事比較 → 共通の一文選択)
+  // ------------------------------------------------------------
+
+  async function playStage1() {
+    renderHud(1);
+    var data = GAME_DATA.stage1;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+    await runPuzzle1(data.puzzle, view, flow);
+    await goToStage(data.next);
+  }
+
+  function runPuzzle1(puzzle, view, flow) {
+    return new Promise(function (resolve) {
+      var promptEl = document.createElement("p");
+      promptEl.className = "line puzzle-prompt";
+      promptEl.textContent = puzzle.prompt;
+      view.appendChild(promptEl);
+
+      var grid = document.createElement("div");
+      grid.className = "article-grid";
+      puzzle.articles.forEach(function (article) {
+        var card = document.createElement("div");
+        card.className = "article-card";
+        var h3 = document.createElement("h3");
+        h3.textContent = article.title;
+        var source = document.createElement("span");
+        source.className = "article-card__source";
+        source.textContent = article.source;
+        card.appendChild(h3);
+        card.appendChild(source);
+        var ul = document.createElement("ul");
+        article.sentences.forEach(function (s) {
+          var li = document.createElement("li");
+          li.textContent = s;
+          ul.appendChild(li);
+        });
+        card.appendChild(ul);
+        grid.appendChild(card);
+      });
+      view.appendChild(grid);
+
+      var list = document.createElement("div");
+      list.className = "choice-list";
+      view.appendChild(list);
+
+      var resultArea = document.createElement("div");
+      resultArea.className = "puzzle-result-area";
+      view.appendChild(resultArea);
+
+      var busy = false;
+      var attempts = 0;
+
+      puzzle.options.forEach(function (opt) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice-btn";
+        btn.textContent = opt.text;
+        btn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          if (busy) return;
+          busy = true;
+          if (opt.id === puzzle.answer) {
+            Array.prototype.forEach.call(list.children, function (b) {
+              b.disabled = true;
+            });
+            state.fragments.push("fragment1");
+            adjustAuth(20);
+            glitchBurst(grid);
+            await showMessage(resultArea, puzzle.successText, "line result-text--success");
+            busy = false;
+            resolve();
+          } else {
+            attempts++;
+            glitchBurst(grid);
+            var hint = puzzle.hints[Math.min(attempts - 1, puzzle.hints.length - 1)];
+            await showMessage(resultArea, hint, "line hint-text");
+            await showMessage(resultArea, puzzle.failText, "line result-text--fail");
+            busy = false;
+          }
+        });
+        list.appendChild(btn);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 2: テクノロジー国境線 (シーザー暗号解読)
+  // ------------------------------------------------------------
+
+  async function playStage2() {
+    renderHud(2);
+    var data = GAME_DATA.stage2;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+    await runPuzzle2(data.puzzle, view);
+    await goToStage(data.next);
+  }
+
+  function runPuzzle2(puzzle, view) {
+    return new Promise(function (resolve) {
+      var promptEl = document.createElement("p");
+      promptEl.className = "line puzzle-prompt";
+      promptEl.textContent = puzzle.prompt;
+      view.appendChild(promptEl);
+
+      var row = document.createElement("div");
+      row.className = "input-row";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.className = "terminal-input";
+      input.placeholder = "回答コードを入力...";
+      input.autocomplete = "off";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "judge-btn";
+      btn.textContent = "判定";
+      row.appendChild(input);
+      row.appendChild(btn);
+      view.appendChild(row);
+
+      var resultArea = document.createElement("div");
+      resultArea.className = "puzzle-result-area";
+      view.appendChild(resultArea);
+
+      var busy = false;
+      var attempts = 0;
+
+      async function judge(e) {
+        e.stopPropagation();
+        if (busy) return;
+        var raw = input.value.trim();
+        if (!raw) return;
+        var normalizedVal = puzzle.caseSensitive ? raw : raw.toUpperCase();
+        var normalizedAnswer = puzzle.caseSensitive ? puzzle.answer : puzzle.answer.toUpperCase();
+        busy = true;
+        if (normalizedVal === normalizedAnswer) {
+          btn.disabled = true;
+          input.disabled = true;
+          state.fragments.push("fragment2");
+          adjustAuth(20);
+          glitchBurst(view);
+          await showMessage(resultArea, puzzle.successText, "line result-text--success");
+          busy = false;
+          resolve();
+        } else {
+          attempts++;
+          adjustAuth(-10);
+          glitchBurst(view);
+          glitchBurst(document.getElementById("authGauge"));
+          var hint = puzzle.hints[Math.min(attempts - 1, puzzle.hints.length - 1)];
+          await showMessage(resultArea, hint, "line hint-text");
+          await showMessage(resultArea, puzzle.failText, "line result-text--fail");
+          busy = false;
+        }
+      }
+
+      btn.addEventListener("click", judge);
+      input.addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+      input.addEventListener("keydown", function (e) {
+        e.stopPropagation();
+        if (e.key === "Enter") judge(e);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 3: 家族の分断 (3択会話 x3)
+  // ------------------------------------------------------------
+
+  async function playStage3() {
+    renderHud(3);
+    var data = GAME_DATA.stage3;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+
+    for (var i = 0; i < data.choiceSets.length; i++) {
+      await runChoiceSet(data.choiceSets[i], flow);
+    }
+
+    await runLines(data.lines_after, flow);
+    state.fragments.push("fragment3");
+    adjustAuth(15);
+    await goToStage(data.next);
+  }
+
+  function runChoiceSet(set, flow) {
+    return new Promise(function (resolve) {
+      var promptEl = document.createElement("p");
+      promptEl.className = "line choice-set-prompt";
+      promptEl.textContent = set.prompt;
+      flow.appendChild(promptEl);
+      scrollToBottom();
+
+      var list = document.createElement("div");
+      list.className = "choice-list";
+      flow.appendChild(list);
+
+      var resolved = false;
+      set.choices.forEach(function (choice) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice-btn";
+        btn.textContent = choice.label;
+        btn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          if (resolved) return;
+          resolved = true;
+          Array.prototype.forEach.call(list.children, function (b) {
+            b.disabled = true;
+          });
+          await runLines(choice.response, flow);
+          resolve();
+        });
+        list.appendChild(btn);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 4: 断片の統合 (3スロット組合せパズル)
+  // ------------------------------------------------------------
+
+  async function playStage4() {
+    renderHud(4);
+    var data = GAME_DATA.stage4;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+    await runPuzzle4(data.puzzle, view);
+    await goToStage(data.next);
+  }
+
+  function runPuzzle4(puzzle, view) {
+    return new Promise(function (resolve) {
+      var promptEl = document.createElement("p");
+      promptEl.className = "line puzzle-prompt";
+      promptEl.textContent = puzzle.prompt;
+      view.appendChild(promptEl);
+
+      var templateEl = document.createElement("p");
+      templateEl.className = "slot-template";
+      view.appendChild(templateEl);
+
+      var selections = {};
+      function optionText(slot, optId) {
+        var found = slot.options.filter(function (o) {
+          return o.id === optId;
+        })[0];
+        return found ? found.text : "？？？";
+      }
+      function renderTemplate() {
+        var parts = puzzle.template.split("____");
+        templateEl.textContent = "";
+        parts.forEach(function (part, idx) {
+          templateEl.appendChild(document.createTextNode(part));
+          if (idx < parts.length - 1) {
+            var slot = puzzle.slots[idx];
+            var span = document.createElement("span");
+            span.className = "slot-blank";
+            span.textContent = selections[slot.id] ? optionText(slot, selections[slot.id]) : "？？？";
+            templateEl.appendChild(span);
+          }
+        });
+      }
+      renderTemplate();
+
+      var groupsWrap = document.createElement("div");
+      groupsWrap.className = "slot-groups";
+      view.appendChild(groupsWrap);
+
+      var judgeBtn = document.createElement("button");
+
+      puzzle.slots.forEach(function (slot) {
+        var group = document.createElement("div");
+        group.className = "slot-group";
+        var label = document.createElement("span");
+        label.className = "slot-group__label";
+        label.textContent = slot.fromFragment;
+        group.appendChild(label);
+        var list = document.createElement("div");
+        list.className = "choice-list";
+        slot.options.forEach(function (opt) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "choice-btn";
+          btn.textContent = opt.text;
+          btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            selections[slot.id] = opt.id;
+            Array.prototype.forEach.call(list.children, function (b) {
+              b.classList.remove("is-selected");
+            });
+            btn.classList.add("is-selected");
+            renderTemplate();
+            judgeBtn.disabled = Object.keys(selections).length < puzzle.slots.length;
+          });
+          list.appendChild(btn);
+        });
+        group.appendChild(list);
+        groupsWrap.appendChild(group);
+      });
+
+      judgeBtn.type = "button";
+      judgeBtn.className = "judge-btn";
+      judgeBtn.textContent = "統合を実行";
+      judgeBtn.disabled = true;
+      view.appendChild(judgeBtn);
+
+      var resultArea = document.createElement("div");
+      resultArea.className = "puzzle-result-area";
+      view.appendChild(resultArea);
+
+      var busy = false;
+      var attempts = 0;
+
+      judgeBtn.addEventListener("click", async function (e) {
+        e.stopPropagation();
+        if (busy) return;
+        busy = true;
+        var combo = puzzle.slots.map(function (s) {
+          return selections[s.id];
+        });
+        var isCorrect = combo.every(function (v, i) {
+          return v === puzzle.correctCombination[i];
+        });
+        if (isCorrect) {
+          judgeBtn.disabled = true;
+          setAuth(100);
+          glitchBurst(view);
+          await showMessage(resultArea, puzzle.successText, "line result-text--success");
+          busy = false;
+          resolve();
+        } else {
+          adjustAuth(-1);
+          glitchBurst(view);
+          glitchBurst(document.getElementById("authGauge"));
+          var hint = puzzle.hints[Math.min(attempts, puzzle.hints.length - 1)];
+          attempts++;
+          await showMessage(resultArea, hint, "line hint-text");
+          await showMessage(resultArea, puzzle.wrongText, "line result-text--fail");
+          busy = false;
+        }
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // STAGE 5: エンディング
+  // ------------------------------------------------------------
+
+  async function playStage5() {
+    renderHud(5);
+    var data = GAME_DATA.stage5;
+    var view = await newStageView();
+    view.appendChild(buildHeading(data.title));
+    var flow = document.createElement("div");
+    flow.className = "line-flow";
+    view.appendChild(flow);
+
+    await runLines(data.lines, flow);
+    await showEnding(data);
+  }
+
+  async function showEnding(data) {
+    var blackout = document.createElement("div");
+    blackout.className = "ending-blackout";
+    document.body.appendChild(blackout);
+    await sleep(30);
+    blackout.classList.add("is-active");
+    await sleep(REDUCE_MOTION ? 30 : 1300);
+
+    var finalScreen = document.createElement("div");
+    finalScreen.className = "ending-final";
+
+    var lastLineText = data.lines[data.lines.length - 1].text;
+    var lineEl = document.createElement("p");
+    lineEl.className = "ending-final__line";
+    lineEl.textContent = lastLineText;
+
+    var noteEl = document.createElement("p");
+    noteEl.className = "ending-final__note";
+    noteEl.textContent = data.footerNote || GAME_DATA.meta.footerNote;
+
+    var restartBtn = document.createElement("button");
+    restartBtn.type = "button";
+    restartBtn.className = "judge-btn restart-btn";
+    restartBtn.textContent = "もう一度プレイ";
+    restartBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      location.reload();
+    });
+
+    finalScreen.appendChild(lineEl);
+    finalScreen.appendChild(noteEl);
+    finalScreen.appendChild(restartBtn);
+    document.body.appendChild(finalScreen);
+
+    await sleep(30);
+    finalScreen.classList.add("is-visible");
+  }
+
+  // ------------------------------------------------------------
+  // ステージ遷移ディスパッチ
+  // ------------------------------------------------------------
+
+  function goToStage(nextKey) {
+    var fns = {
+      stage1: playStage1,
+      stage2: playStage2,
+      stage3: playStage3,
+      stage4: playStage4,
+      stage5: playStage5,
+    };
+    if (!nextKey || !fns[nextKey]) return Promise.resolve();
+    return fns[nextKey]();
+  }
+
+  // ------------------------------------------------------------
+  // 起動
+  // ------------------------------------------------------------
+
+  document.addEventListener("click", onGlobalClick);
+  document.addEventListener("DOMContentLoaded", function () {
+    var titleEl = document.getElementById("gameTitle");
+    if (titleEl) titleEl.textContent = GAME_DATA.meta.title;
+    playStage0();
+  });
+})();
+</script>
+</body>
+</html>
