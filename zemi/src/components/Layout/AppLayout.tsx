@@ -22,6 +22,9 @@ function panelId(tab: MobileTab): string {
  * 意味を持つ。lg以上はタブバー自体が`lg:hidden`でDOM上も非表示(display:none)になり
  * 対応する`role="tab"`が存在しなくなるため、lg以上ではtabpanelロールを一切付与しない
  * (デスクトップ3ペインレイアウトのセマンティクスに`role="tabpanel"`を混入させないため)。
+ * `tabIndex: 0`も同様にlg未満でのみ付与する。イベントログ/タイムラインのように内部に
+ * 操作可能な要素を持たないパネルでも、選択中のタブから`Tab`キーで進んだ先に
+ * フォーカス可能な要素が存在するようにするため(ARIA APGのtabpanelパターン推奨)。
  */
 function mobilePanelAttrs(tab: MobileTab, isDesktop: boolean) {
   if (isDesktop) return {};
@@ -29,6 +32,7 @@ function mobilePanelAttrs(tab: MobileTab, isDesktop: boolean) {
     id: panelId(tab),
     role: 'tabpanel' as const,
     'aria-labelledby': tabId(tab),
+    tabIndex: 0,
   };
 }
 
@@ -55,6 +59,10 @@ function paneVisibilityClass(tab: MobileTab, activeTab: MobileTab): string {
  * ARIAのtabパターンを実装: 各tabに`id`/`aria-controls`(対応するtabpanelを指す)、
  * ロービングフォーカス(選択中のみtabIndex=0、他は-1)、左右矢印キーでのタブ移動(端で折り返し、
  * 移動先を選択状態にしてフォーカスも移す)。
+ * DOM上はステージ領域(パネル群)より前に置き、`order-last`で見た目の並び(タブバーが画面下部)
+ * だけを維持する。こうすることで、選択中のタブから`Tab`キーを押した際に次のDOM要素である
+ * 対応パネルへ進める(ARIA APGのtabパターンが期待するフォーカス順序)。lg以上は`lg:hidden`で
+ * このコンポーネント自体がdisplay:noneになるため、`order-last`はレイアウトに影響しない。
  */
 function MobileTabBar({
   activeTab,
@@ -84,7 +92,10 @@ function MobileTabBar({
   };
 
   return (
-    <div role="tablist" className="flex shrink-0 border-t border-slate-800 bg-slate-900/60 lg:hidden">
+    <div
+      role="tablist"
+      className="order-last flex shrink-0 border-t border-slate-800 bg-slate-900/60 lg:hidden"
+    >
       {tabs.map((tab, index) => {
         const selected = activeTab === tab.key;
         return (
@@ -135,6 +146,12 @@ export default function AppLayout() {
 
   return (
     <div className="h-[100dvh] lg:h-screen w-screen bg-cyberbg overflow-hidden text-slate-200 flex flex-col">
+      {/* MobileTabBar(role="tablist")をステージ領域(パネル群)より前のDOM順で置く。
+          選択中のタブから`Tab`キーで進んだ際に次のDOM要素である対応パネルへ移動できるようにするため
+          (ARIA APGのtabパターンが期待するフォーカス順序)。見た目の並び(タブバーが画面下部)は
+          MobileTabBar側の`order-last`で維持しており、lg以上はタブバー自体が`lg:hidden`のため
+          `order-last`の影響を受けない。 */}
+      <MobileTabBar activeTab={activeTab} onSelect={setActiveTab} />
       {/* ステージ領域: lg以上は「マップ+サイドバー行」と「タイムライン行」の2段(現行のまま)。
           lg未満はマップ/イベントログ/タイムラインの3ペインを同一矩形に絶対配置で重ね、
           タブで表示切替する(いずれも常にマウントしたまま、visibilityのみ切り替える)。 */}
@@ -162,7 +179,6 @@ export default function AppLayout() {
           <Timeline />
         </div>
       </div>
-      <MobileTabBar activeTab={activeTab} onSelect={setActiveTab} />
       {/* モーダル本体は isolate スコープの外(ルート直下)に置く。中に入れるとスタッキングコンテキストが
           閉じてサイドバーの下に潜ってしまうため */}
       <WelcomeOverlay open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />

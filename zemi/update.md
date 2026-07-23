@@ -63,6 +63,13 @@
 - 確認: `npm run build`(`tsc -b && vite build`)成功、`npx oxlint src`成功(エラーなし)。デスクトップ不変性は`useMediaQuery(DESKTOP_MEDIA_QUERY)`によるビューポート幅ベースの判定で担保し、`isDesktop === true`の間は`layoutScale`/`visualScale`/`nodeVisualScale`が常に`1`、`ParticleCanvas`の`active`は常に`true`になることをコードレベルで保証した。
 - 影響範囲(追加): `src/hooks/useMediaQuery.ts`(新規)、`src/components/Layout/AppLayout.tsx`、`src/components/NetworkMap/NetworkMap.tsx`、`src/components/NetworkMap/useNetworkLayout.ts`、`src/components/NetworkMap/constants.ts`(コメントのみ)、`src/components/NetworkMap/ParticleCanvas.tsx`、`src/components/Timeline/Timeline.tsx`
 
+**Codexレビュー2周目の結果と対応**: 新たなblockerは無かった。
+- **should 1件(修正済み)**: `AppLayout.tsx`でDOM順序が「タブパネル群(ステージ領域)→タブリスト(`MobileTabBar`)」になっており、タブにフォーカスがある状態で`Tab`キーを押しても選択中パネルへ進めなかった(ARIA Tabsパターンの期待挙動に反する)。加えてパネル自体に`tabIndex`が無く、操作可能な要素を持たないパネル(イベントログ/タイムライン)にはフォーカス先が存在しなかった。**対応**: `MobileTabBar`のJSXをステージ領域より前に移動しDOM順を「タブリスト→パネル群」に変更した上で、`MobileTabBar`のルート`div`に`order-last`を付与し見た目(タブバーが画面下部)は維持した。`lg`以上は`MobileTabBar`自体が`lg:hidden`でdisplay:noneになるため`order-last`はデスクトップのレイアウトに一切影響しない(ステージ領域側は`order`未指定でデフォルト`order:0`のまま)。あわせて`mobilePanelAttrs(tab, isDesktop)`に`tabIndex: 0`を追加し(`isDesktop`がtrueの場合は従来どおり`{}`を返し何も付与しない)、モバイル時のパネルがフォーカス可能になるようにした。
+- **nice 1件(見送り)**: 「`isDesktop`のメディアクエリを`AppLayout`と`NetworkMap`で二重購読している(`AppLayout`から`prop`で渡して単一ソースにすると堅牢)」との指摘があったが、両者とも同じ`useMediaQuery(DESKTOP_MEDIA_QUERY)`を独立に購読しているだけでリークや値の不整合(競合)は発生しないため、blockerでもshouldでもないと判断し見送った。
+- **Codexが解消/妥当性を確認した点**: スケール判定(`layoutScale`/`visualScale`)がデスクトップで常に`1`固定であること(不変性)、`useMediaQuery`の購読・クリーンアップが正しいこと、`ParticleCanvas`の粒子状態(外部シングルトン)がタブ切替を挟んでも失われないこと、`mobilePanelAttrs`による`role="tabpanel"`のlg判定での出し分けが妥当であること、`NaN`ガード見送りの判断も妥当であること。
+- 確認: `npm run build`(`tsc -b && vite build`)成功、`npx oxlint src`成功(エラーなし)。デスクトップ不変性は、`mobilePanelAttrs`が`isDesktop === true`のとき`tabIndex`を含め一切のARIA属性を付与しないこと、`order-last`が付与される`MobileTabBar`自体が`lg`以上で`display:none`になり`order`の影響を受けないこと(ステージ領域側の`order`は変更していないため`lg`以上のflexアイテム順序は従来のまま)の2点で担保した。
+- 影響範囲(追加): `src/components/Layout/AppLayout.tsx`(DOM順序変更・コメント更新のみ、他ファイルは変更なし)
+
 ## 2026-07-23 — 公開URL固定化とdist更新漏れ対策
 **立案**: 公開URL https://mumekunx.github.io/shajitu/zemi/dist/ を今後絶対に変えず、かつ `zemi/dist/` の更新をコミットし続けられる状態にする。
 - 実装方針:
