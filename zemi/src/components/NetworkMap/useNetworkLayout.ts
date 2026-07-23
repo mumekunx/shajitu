@@ -9,7 +9,7 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force';
 import type { NetworkNode, NetworkLink } from '../../types';
-import { NODE_RADIUS } from './constants';
+import { NODE_RADIUS, computeLayoutScale, computeVisualScale } from './constants';
 
 export interface LayoutNode extends SimulationNodeDatum {
   id: string;
@@ -49,20 +49,25 @@ export function useNetworkLayout(
       y: n.y,
     }));
 
+    // Phase2: 狭い画面(lg未満)向けにパラメータを縮小するスケール。
+    // width >= 1024 では常に1(従来値と完全一致)。
+    const layoutScale = computeLayoutScale(width, height);
+    const visualScale = computeVisualScale(width, height);
+
     const linkForce = forceLink<LayoutNode, { source: string; target: string }>(
       links.map((l) => ({ source: l.source, target: l.target }))
     )
       .id((d) => d.id)
-      .distance(120)
+      .distance(120 * layoutScale)
       .strength(0.5);
 
     const sim = forceSimulation<LayoutNode>(layoutNodes)
       .force('link', linkForce)
-      .force('charge', forceManyBody().strength(-260))
+      .force('charge', forceManyBody().strength(-260 * layoutScale))
       .force('center', forceCenter(width / 2, height / 2))
       .force(
         'collide',
-        forceCollide<LayoutNode>((d) => NODE_RADIUS[d.type] + 24)
+        forceCollide<LayoutNode>((d) => NODE_RADIUS[d.type] * visualScale + 24 * layoutScale)
       )
       .alpha(1)
       .alphaDecay(0.04);
@@ -70,9 +75,11 @@ export function useNetworkLayout(
     sim.on('tick', () => {
       const next: Record<string, NodePosition> = {};
       for (const n of layoutNodes) {
-        const margin = NODE_RADIUS[n.type] + 30;
-        n.x = Math.max(margin, Math.min(width - margin, n.x ?? width / 2));
-        n.y = Math.max(margin, Math.min(height - margin, n.y ?? height / 2));
+        const margin = NODE_RADIUS[n.type] * visualScale + 30 * layoutScale;
+        // 幅/高さがmargin*2に満たない狭さでは、従来のclamp式は`min`が先に効いて
+        // 全ノードが同一座標(margin側)に潰れてしまうため、中央寄せにフォールバックする。
+        n.x = width < margin * 2 ? width / 2 : Math.max(margin, Math.min(width - margin, n.x ?? width / 2));
+        n.y = height < margin * 2 ? height / 2 : Math.max(margin, Math.min(height - margin, n.y ?? height / 2));
         next[n.id] = { x: n.x, y: n.y };
       }
       setPositions(next);

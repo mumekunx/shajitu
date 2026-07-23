@@ -61,7 +61,7 @@ export default function WelcomeOverlay({ open, onClose }: WelcomeOverlayProps) {
                   type="button"
                   aria-label="閉じる"
                   onClick={onClose}
-                  className="shrink-0 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700/70 hover:text-white"
+                  className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700/70 hover:text-white lg:min-h-0 lg:min-w-0"
                 >
                   ×
                 </button>
@@ -149,7 +149,9 @@ export function WelcomeOverlayLauncher({ onOpen }: { onOpen: () => void }) {
       aria-label="操作ガイドを表示"
       title="操作ガイドを表示"
       onClick={onOpen}
-      className="absolute right-4 top-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-sm font-semibold text-slate-300 shadow-lg shadow-black/40 backdrop-blur-md transition-colors hover:bg-slate-800/80 hover:text-cyan-400"
+      // lg未満は実ボックス自体を44px(min-h-11/min-w-11)に拡大してタップ領域を確保する。
+      // lg以上はlg:h-8 lg:w-8 lg:min-h-0 lg:min-w-0で元のh-8 w-8(32px)に戻し、見た目を維持する。
+      className="absolute right-4 top-4 z-40 flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-sm font-semibold text-slate-300 shadow-lg shadow-black/40 backdrop-blur-md transition-colors hover:bg-slate-800/80 hover:text-cyan-400 lg:h-8 lg:w-8 lg:min-h-0 lg:min-w-0"
     >
       ?
     </button>

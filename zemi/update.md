@@ -21,6 +21,36 @@
 - 確認: `npm run build`成功(`tsc -b && vite build`、型エラーなし)。`npx oxlint src`もエラーなし。
 - 残課題: Phase2(スマホ対応、下部タブ切替方式)は未着手。
 
+**Phase2立案**: スマホ(`lg`未満、1024px未満)対応。`lg`以上のデスクトップ表示は現状から一切変えないことを最重要制約とする。
+- 実装方針:
+  1. **下部タブ切替レイアウト**: `AppLayout.tsx`に`useState<'map'|'log'|'timeline'>('map')`でタブ状態を持つ。`lg`以上は現行の3ペイン(マップ+右サイドバー320px、下段タイムライン)を`lg:`プレフィックスでそのまま維持。`lg`未満はマップ/イベントログ/タイムラインの3ペインを同一矩形に`absolute inset-0`で重ね、非選択ペインは`invisible pointer-events-none`(`hidden`ではなく`invisible`を選ぶ理由: `NetworkMap`は自身の`ResizeObserver`でコンテナ実寸を測り、その値が`useNetworkLayout`の`d3-force`再構築トリガーになっている。`display:none`相当の`hidden`だと非表示中に実寸が0×0になり、再表示時に`width/height`変化を検知してシミュレーションが再構築され、ノード配置が起点座標まで飛ぶ。`visibility:hidden`はレイアウトボックスの寸法を保持するため、この問題を回避しつつ視覚的にもポインタ操作的にも隠せる)。下部に`lg:hidden`のタブバー(各ボタン`min-h-11`、`role="tab"`/`aria-selected`、件数バッジ付き)を新設。
+  2. **ビューポート高さ**: `h-screen`→`h-[100dvh]`。
+  3. **ノード配置のスケール**: `constants.ts`に`computeLayoutScale(width,height)`(幅が1024px以上なら常に1を返し、デスクトップは無条件で従来値と完全一致させる。1024px未満のみ短辺/640を0.5〜1にクランプして縮小)と`computeVisualScale`(同じ値を読みやすさ確保のため下限0.75でクランプ、ノード半径・フォント用)を追加。`useNetworkLayout.ts`の`forceLink.distance`/`forceManyBody.strength`/`forceCollide`/margin計算にこれらを掛け、`width<margin*2`のとき潰れず中央寄せするガードも追加。`NodeView.tsx`に`scale`propを追加しノード半径・ラベルfontSizeをスケール。
+  4. **下部オーバーレイの狭幅対応**: `NetworkMap.tsx`の下部行を`flex-col-reverse`(モバイル: 統計パネルが上・ツールバーが下)↔`lg:flex-row`(デスクトップは現行のまま)に変更。`StatsPanel.tsx`の`w-64`固定を`w-full max-w-xs lg:w-64`に変更。
+  5. **タップ領域44px化**: `Timeline.tsx`のマーカー、`WelcomeOverlay.tsx`の起動ボタンは`before:absolute`の透明疑似要素で当たり判定のみ拡張(見た目は不変)。`AttackToolbar.tsx`のボタン群(隣接ボタン間隔が狭く疑似要素の当たり判定が重なると誤タップの恐れがあるため)と`WelcomeOverlay.tsx`の閉じるボタンは`min-h-11`(+閉じるボタンのみ`min-w-11`)を追加して実ボックス自体を拡大し、`lg:min-h-0`(+`lg:min-w-0`)でデスクトップのみ元サイズに戻す。
+- 影響範囲: `src/components/Layout/AppLayout.tsx`、`src/components/NetworkMap/NetworkMap.tsx`、`src/components/NetworkMap/useNetworkLayout.ts`、`src/components/NetworkMap/constants.ts`、`src/components/NetworkMap/NodeView.tsx`、`src/components/NetworkMap/AttackToolbar.tsx`、`src/components/StatsPanel/StatsPanel.tsx`、`src/components/Timeline/Timeline.tsx`、`src/components/Onboarding/WelcomeOverlay.tsx`。シミュレーションのロジック・ストア・攻撃の挙動・`vite.config.ts`の`base`は変更しない。
+- やらないこと(Phase3に送る): hover依存UIのタップ代替(`NodeView`の`<title>`、`AttackToolbar`の`title`属性、`Timeline`の`group-hover`ツールチップ)、`prefers-reduced-motion`対応。
+
+**Phase2修正: マップが下部オーバーレイに覆われて見える問題の是正**(初回実装のPlaywright実機検証で発覚)。
+- 発覚した問題:
+  1. 初回実装では375×667でも`AttackToolbar`/`StatsPanel`をNetworkMap内に`absolute inset-x-4 bottom-4`のオーバーレイのまま残し縦積み(`flex-col-reverse`)にしただけだったため、`StatsPanel`(縦積みカード、約270px)+`AttackToolbar`(SSH行+ボタン2行、約180px)=合計450px超が画面下3/4を覆い、マップがほぼ見えない状態だった。
+  2. `WelcomeOverlayLauncher`(「?」ボタン)は`before`疑似要素で当たり判定のみ44pxに拡張していたが、実ボックス自体は`h-8 w-8`(32px)のままだったため、Playwrightの`boundingBox()`のような実測ベースの検証では32pxとして検出され「44px未満」と判定された。
+- 修正方針:
+  1. **オーバーレイ→実フロー化**: `NetworkMap.tsx`のルートを`relative flex h-full w-full flex-col`の縦2段に再構成。(1)マップ本体エリア(`ref={containerRef}`、`min-h-0 flex-1`)と(2)下部コントロール領域。`lg`(1024px)以上はコントロール領域を`lg:absolute lg:inset-x-4 lg:bottom-4 lg:z-20 lg:pointer-events-none`でマップ上に浮かせる(Phase1のz階層・構成を完全維持)。この時マップ本体エリアはflex-1の唯一のフローの子になるため実質100%を占め、デスクトップの見た目はPhase1から一切変わらない(Playwrightで1024px/1440pxのスクリーンショットを取り目視確認、`?`ボタンの実測サイズも32×32pxのまま)。`lg`未満はコントロール領域を`shrink-0`の通常フロー(`border-t border-slate-800/60 bg-slate-950/60 p-3`)でマップの下に実配置し、マップの上に何も重ねない。
+  2. **`StatsPanel`のコンパクト化**: `lg`未満用に`CompactStat`(ラベル+数値のみの縦積みミニブロック)を4つ(CPU/MEM/NET/SCORE)横並びにした1行(高さ実測約52px)を追加。`lg`以上は従来のカード(`GaugeBar`×3+`AttackScoreCounter`)のまま。同一コンポーネントインスタンス内に両マークアップを持ち`lg:hidden`/`hidden lg:block`で切替(`stats`購読は1箇所のみ)。
+  3. **`AttackToolbar`のコンパクト化**: `lg`未満用にSSH認証切替行・攻撃ボタン行をそれぞれ`overflow-x-auto`の横スクロール1行(ボタンは`min-h-11`でタップ領域44px維持)にした版を追加。`lg`以上は従来の折り返しレイアウトのまま。同一コンポーネントインスタンス内で`sshAuthMethod`のstateと`handleClick`を共有するため、表示を切り替えても選択状態は一致する。
+  4. **`WelcomeOverlayLauncher`のタップ領域**: `before`疑似要素方式をやめ、`lg`未満で実ボックス自体を`h-11 w-11 min-h-11 min-w-11`(44px)に拡大し、`lg:h-8 lg:w-8 lg:min-h-0 lg:min-w-0`で元の32pxに戻す方式に変更(実測ベースの検証でも正しく44px以上と判定されるようにするため)。`Timeline.tsx`のマーカーは対象外のまま(クリックハンドラを持たない装飾要素であり、イベント密集時に実ボックスを拡大すると隣接マーカーが視覚的に重なる副作用の方が大きいため、`before`疑似要素方式を維持)。
+- 検証: Playwright(chromium, 1.61.1)を一時的にscratchpadへ`npm install`しdevサーバー(`vite preview`)に対し実行。
+  - 375×667でマップタブを開いた際のマップSVG実測高さ: **419.5px**(目標350px以上を達成)。
+  - `?`起動ボタンの`boundingBox()`: モバイル(375×667)`44×44`、デスクトップ(1440×900)`32×32`(Phase1から不変)。
+  - スクリーンショットで、マップタブ(ノード・ラベルが完全に見える状態)/イベントログタブ/タイムラインタブの3タブ切替、デスクトップ1440px(オーバーレイがPhase1と同一の見た目)、デスクトップ1024px境界(lg以上のロジックが正しく発動していることを確認。1024pxちょうどでは`StatsPanel`が一部ノードに重なるが、これはPhase1由来の絶対配置オーバーレイの既存挙動であり今回変更していない箇所のため許容)を目視確認。
+- 影響範囲(追加): `src/components/NetworkMap/NetworkMap.tsx`(構造再編)、`src/components/StatsPanel/StatsPanel.tsx`(コンパクト版追加)、`src/components/NetworkMap/AttackToolbar.tsx`(コンパクト版追加)、`src/components/Onboarding/WelcomeOverlay.tsx`(起動ボタンのタップ領域方式変更)。
+
+**Phase2完了**: 上記の初回実装+修正版を最終形として完了。
+- `npm run build`成功(`tsc -b && vite build`、型エラーなし)。
+- `npx oxlint src`成功(エラーなし)。
+- `zemi/detail.md`の該当エントリ(`AppLayout.tsx`/`NetworkMap.tsx`/`useNetworkLayout.ts`/`constants.ts`/`NodeView.tsx`/`AttackToolbar.tsx`/`StatsPanel.tsx`/`Timeline.tsx`/`WelcomeOverlay.tsx`)を最新実装に合わせて更新済み。
+
 ## 2026-07-23 — 公開URL固定化とdist更新漏れ対策
 **立案**: 公開URL https://mumekunx.github.io/shajitu/zemi/dist/ を今後絶対に変えず、かつ `zemi/dist/` の更新をコミットし続けられる状態にする。
 - 実装方針:

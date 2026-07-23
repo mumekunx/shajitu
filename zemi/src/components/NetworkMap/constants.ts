@@ -33,6 +33,37 @@ export const NODE_RADIUS: Record<NodeType, number> = {
   attacker: 16,
 };
 
+/** Phase2: 狭い画面向けにd3-forceのレイアウトパラメータ・ノード半径・ラベルを段階的に縮小するためのスケール計算。
+ * `lg`ブレークポイント(1024px)未満のコンテナ幅でのみ働く基準値。それ以上ではdesktop表示を一切変えない。 */
+const MOBILE_LAYOUT_BREAKPOINT = 1024;
+/** この短辺(px)以上ではスケール1(従来値)扱いにする基準値 */
+const MOBILE_REFERENCE_EXTENT = 640;
+/** どれだけ狭くてもここより下にはスケールしない(潰れ防止) */
+const MOBILE_MIN_SCALE = 0.5;
+/** ノード半径・フォントサイズは読みやすさ確保のためこの値を下限にクランプする */
+const VISUAL_MIN_SCALE = 0.75;
+
+/**
+ * d3-forceの距離/反発力/衝突半径・marginに掛けるスケール。
+ * 幅が`lg`ブレークポイント(1024px)以上のときは常に1を返し、デスクトップの見た目を一切変えない。
+ * それ未満のときのみ、短辺(width/heightの小さい方)を基準に0.5〜1の範囲で縮小する。
+ */
+export function computeLayoutScale(width: number, height: number): number {
+  if (width >= MOBILE_LAYOUT_BREAKPOINT) return 1;
+  const extent = Math.min(width, height);
+  if (extent <= 0) return 1;
+  const raw = extent / MOBILE_REFERENCE_EXTENT;
+  return Math.min(1, Math.max(MOBILE_MIN_SCALE, raw));
+}
+
+/**
+ * ノード半径・ラベルのフォントサイズに掛けるスケール。
+ * `computeLayoutScale`と同じ基準だが、読めなくならないようVISUAL_MIN_SCALE(0.75)を下限にクランプする。
+ */
+export function computeVisualScale(width: number, height: number): number {
+  return Math.max(VISUAL_MIN_SCALE, computeLayoutScale(width, height));
+}
+
 /** ノードtypeごとの説明(初見者向け。ホバーツールチップとウェルカム画面の機器一覧で使用) */
 export const NODE_DESCRIPTIONS: Record<NodeType, { label: string; description: string }> = {
   attacker: {

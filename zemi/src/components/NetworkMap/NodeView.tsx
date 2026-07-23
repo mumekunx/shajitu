@@ -8,6 +8,8 @@ interface NodeViewProps {
   y: number;
   /** port_scan などで現在ターゲットになっている場合、走査線/枠を一瞬光らせる */
   isScanTarget?: boolean;
+  /** 狭い画面向けにノード半径・ラベルを縮小するスケール(既定1=デスクトップと同じ)。computeVisualScaleの戻り値を想定 */
+  scale?: number;
 }
 
 /**
@@ -17,9 +19,10 @@ interface NodeViewProps {
  * - infected の場合は赤い波紋・オーラ・ジッターを重ねる
  * - firewall の場合は六角シールドを常時表示
  */
-export default function NodeView({ node, x, y, isScanTarget }: NodeViewProps) {
+export default function NodeView({ node, x, y, isScanTarget, scale = 1 }: NodeViewProps) {
   const baseColor = NODE_COLORS[node.type];
-  const radius = NODE_RADIUS[node.type];
+  const radius = NODE_RADIUS[node.type] * scale;
+  const fontSize = 11 * scale;
   const isFirewall = node.type === 'firewall';
 
   return (
@@ -111,7 +114,7 @@ export default function NodeView({ node, x, y, isScanTarget }: NodeViewProps) {
         x={0}
         y={radius + 16}
         textAnchor="middle"
-        fontSize={11}
+        fontSize={fontSize}
         fill="#cbd5e1"
         style={{ userSelect: 'none', pointerEvents: 'none' }}
       >

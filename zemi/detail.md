@@ -139,12 +139,15 @@
 
 ## `src/components/Layout/AppLayout.tsx`
 
-**役割**: 画面全体のグリッド/フレックスレイアウトシェル。左=NetworkMap、右=EventLog、下=Timeline。`WelcomeOverlay`の開閉state(`welcomeOpen`)をここで保持しcontrolled化する(起動ボタンとモーダル本体を構造的に分離するため)。StatsPanelは(Phase1の変更で)NetworkMap側に移動し、本コンポーネントはもう持たない。
+**役割**: 画面全体のレイアウトシェル。`lg`(1024px)以上は現行どおり「左=NetworkMap、右=EventLog、下=Timeline」の3ペイン固定表示。`lg`未満(Phase2で追加)はマップ/イベントログ/タイムラインの3ペインを同一矩形に絶対配置で重ね、画面下部の`lg:hidden`タブバーで表示を切り替えるモバイル専用レイアウトになる。`WelcomeOverlay`の開閉state(`welcomeOpen`)はここで保持しcontrolled化する(起動ボタンとモーダル本体を構造的に分離するため)。StatsPanelは(Phase1の変更で)NetworkMap側に移動し、本コンポーネントはもう持たない。ルートの高さは`h-[100dvh]`(Phase2でモバイルブラウザのアドレスバー伸縮対策として`h-screen`から変更)。
 
-**主要な型・メソッド**:
-- `export default function AppLayout()` — 唯一のexport。Propsなし。マップ領域ラッパ(`relative isolate flex-1`)に`isolate`を付与し、マップ内のz-indexをこのスコープに閉じ込める。`welcomeOpen`が`false`の間だけマップ領域ラッパ内に`WelcomeOverlayLauncher`(「?」起動ボタン)を配置し、`WelcomeOverlay`本体はルート直下(`isolate`スコープの外)に`fixed inset-0 z-50`のまま配置する。
+**主要な型・関数**:
+- `MobileTab` type — `'map' | 'log' | 'timeline'`。`lg`未満での選択中タブを表す。
+- `paneVisibilityClass(tab, activeTab): string` (非export) — `lg`未満で非選択ペインを隠すクラス文字列を返す。`hidden`(`display:none`)ではなく`invisible`(`visibility:hidden`)を採用している理由: `NetworkMap`は自身の`ResizeObserver`でコンテナ実寸を測り、その値が`useNetworkLayout`の`d3-force`再構築トリガーになっているため、`display:none`だと非表示中に実寸が0×0になり再表示時にシミュレーションが再構築されノード配置が飛ぶ。`visibility:hidden`はレイアウトボックスの寸法を保持したまま隠せるため、この問題を回避しつつ`pointer-events`もキーボードフォーカスも遮断できる。`lg`以上では常に`visible`/`pointer-events-auto`にオーバーライドし、タブ状態に関係なく3ペインとも表示・操作可能にする。
+- `MobileTabBar({ activeTab, onSelect })` (非export) — `lg`未満でのみ表示するタブバー(`role="tablist"`、各ボタン`role="tab"`/`aria-selected`/`min-h-11`)。マップ/イベントログ(件数バッジ付き)/タイムライン(件数バッジ付き)の3ボタン。`AppLayout`本体とは別に`useSimulationStore`から`logs.length`/`timeline.length`を購読する専用コンポーネントとして切り出しており、ログ/タイムラインが頻繁に増える攻撃中でも、再レンダーの範囲をこのタブバーだけに限定し`NetworkMap`等の再レンダーを増やさない設計。
+- `export default function AppLayout()` — 唯一のexport。Propsなし。`welcomeOpen`(モーダル開閉)と`activeTab`(`lg`未満のタブ選択、既定`'map'`)の2つの`useState`を保持する。ステージ領域(`relative flex-1 min-h-0 lg:flex lg:flex-col`)の中に「マップ+イベントログの行(`lg`以上は`flex`の横並び、`lg`未満は各ペインが`absolute inset-0`で重なる)」と「タイムライン(`lg`以上は`static`で下段固定、`lg`未満は同じく`absolute inset-0`で重なる)」を配置し、`paneVisibilityClass`で表示を切り替える。マップペインには`isolate`を付与し、マップ内のz-indexをこのスコープに閉じ込める。`welcomeOpen`が`false`の間だけマップペイン内に`WelcomeOverlayLauncher`(「?」起動ボタン)を配置し、`WelcomeOverlay`本体はルート直下(`isolate`スコープの外)に`fixed inset-0 z-50`のまま配置する。ステージ領域の下に`MobileTabBar`を配置する(`lg`以上では内部で`lg:hidden`により非表示)。
 
-**依存しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`, `src/components/EventLog/EventLog.tsx`, `src/components/Timeline/Timeline.tsx`, `src/components/Onboarding/WelcomeOverlay.tsx`(`WelcomeOverlay`, `WelcomeOverlayLauncher`)
+**依存しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`, `src/components/EventLog/EventLog.tsx`, `src/components/Timeline/Timeline.tsx`, `src/components/Onboarding/WelcomeOverlay.tsx`(`WelcomeOverlay`, `WelcomeOverlayLauncher`), `src/store/simulationStore.ts`(`useSimulationStore`、`MobileTabBar`内で`logs.length`/`timeline.length`のみ読み取り)
 
 **このファイルを参照しているファイル**: `src/App.tsx`
 
@@ -157,8 +160,8 @@
 **主要な型・関数**:
 - `NODE_TYPE_ORDER: NodeType[]` — 「登場する機器」節での表示順(通信の流れが分かる順)。
 - `WelcomeOverlayProps` interface — `{ open: boolean; onClose: () => void }`。
-- `WelcomeOverlay({ open, onClose })` (default export) — モーダル本体のみを描画する。`open`中は`Escape`キーで`onClose`を呼ぶ`keydown`リスナーを登録(クリーンアップ付き)。`fixed inset-0 z-50`の背景オーバーレイ(クリックで`onClose`)+中央の`role="dialog"`カード(内容は不変: 説明文/画面の見方/登場する機器一覧/やってみよう/注記/「始める」ボタン、いずれも`onClose`を呼ぶ)。
-- `WelcomeOverlayLauncher({ onOpen })` (named export、新規) — 「?」起動ボタンのみを描画する。呼び出し側(`AppLayout`)が`open === false`の時だけ条件付きでマウントする。`absolute right-4 top-4 z-40`でマップ領域ラッパ内に配置される前提(旧: 自身が`fixed right-4 top-4 z-50`でビューポート右上に固定されており、右サイドバー(EventLogヘッダー)と衝突していた)。
+- `WelcomeOverlay({ open, onClose })` (default export) — モーダル本体のみを描画する。`open`中は`Escape`キーで`onClose`を呼ぶ`keydown`リスナーを登録(クリーンアップ付き)。`fixed inset-0 z-50`の背景オーバーレイ(クリックで`onClose`)+中央の`role="dialog"`カード(内容は不変: 説明文/画面の見方/登場する機器一覧/やってみよう/注記/「始める」ボタン、いずれも`onClose`を呼ぶ)。閉じるボタン(`×`)は**Phase2でタップ領域を拡大**: `lg`未満は`min-h-11 min-w-11`で実ボックス自体を44px以上にし、`lg:min-h-0 lg:min-w-0`で元の見た目(`px-2.5 py-1`)に戻す。
+- `WelcomeOverlayLauncher({ onOpen })` (named export) — 「?」起動ボタンのみを描画する。呼び出し側(`AppLayout`)が`open === false`の時だけ条件付きでマウントする。`absolute right-4 top-4 z-40`でマップ領域ラッパ内に配置される前提(旧: 自身が`fixed right-4 top-4 z-50`でビューポート右上に固定されており、右サイドバー(EventLogヘッダー)と衝突していた)。ボタン本体サイズは**Phase2で`lg`未満のみ`h-11 w-11 min-h-11 min-w-11`(44px)に拡大**し、タップ領域を確保する。`lg:h-8 lg:w-8 lg:min-h-0 lg:min-w-0`で元の見た目(32px)に戻すため、`lg`以上の見た目はPhase1から変わらない。
 
 **依存しているファイル**: `framer-motion`(`AnimatePresence`, `motion`)、`../NetworkMap/constants`(`NODE_COLORS`, `NODE_DESCRIPTIONS`)、`../../types`(`NodeType`)
 
@@ -171,11 +174,11 @@
 **役割**: メインビジュアル本体。背景グリッド、SVGによるリンク/ノード/攻撃エフェクトの描画、Canvas 2Dによる粒子描画、攻撃トリガーツールバー+統計パネルを統合する。`useSimulationStore`から`nodes`/`links`/`activeAttacks`を読み取り専用で参照する。**Phase3で実装完了、Phase1(UI重なり解消)でStatsPanelを統合**。
 
 **主要な型・関数**:
-- `NetworkMap()` (default export) — ルートコンポーネント。`ResizeObserver`でコンテナのピクセルサイズ(`size.width/height`)を測定し、`useNetworkLayout`にサイズと`nodes`/`links`を渡してノード位置(`positions`)を取得する。`activeAttacks`から`port_scan`の現在ターゲットID集合(`scanTargetIds`)と`ddos`進行中フラグ(`hasDdos`)を算出し、それぞれ`NodeView`の走査枠表示・背景の赤グローに反映する。加えて`ddosAttacks = activeAttacks.filter(a => a.type === 'ddos')`を算出し、SVG内の`AttackEffectsLayer`直後・`NodeView`群の直前に`<BotnetLayer attacks={ddosAttacks} positions={positions} width={size.width} height={size.height} />`を差し込む。SVG内で`<line>`によるリンク描画→`AttackEffectsLayer`→`BotnetLayer`→`NodeView`の順にレイヤリングし、その上に`ParticleCanvas`を完全重畳(`position:absolute`)で配置する。位置指定コンテナ直下に`<AttackExplanation />`(z-30、攻撃実行中のリアルタイム解説カードをネットワーク図上部に重畳表示。props受け渡しなし)を配置する。既存の`hasDdos`背景グロー・`runDdos`ロジックは変更なし。
-- 下部オーバーレイ行(`pointer-events-none absolute inset-x-4 bottom-4 z-20 flex items-end justify-between`)を1本新設し、その中に`AttackToolbar`(左、`pointer-events-auto min-w-0`)と`StatsPanel`(右、`pointer-events-auto shrink-0`)を同じ親として左右に並べる。旧構成では`AttackToolbar`(NetworkMap側)と`StatsPanel`(旧AppLayout側)が別々の親から画面下部に絶対配置されていて重なっていたため、両者を1つの親にまとめることで構造的に重なり得ない形にした。行自体は`pointer-events-none`でマップのクリックを奪わないようにし、中の2要素だけ`pointer-events-auto`で操作可能にする。
+- `NetworkMap()` (default export) — ルートコンポーネント。返り値の最上位は`relative flex h-full w-full flex-col overflow-hidden`の縦フレックスで、(1)マップ本体エリア(`ref={containerRef}`、`network-grid-bg relative min-h-0 flex-1 overflow-hidden`)と(2)下部コントロール領域の2段構成(Phase2でモバイル対応のため追加)。`ResizeObserver`は(1)のマップ本体エリアを測定対象にし、`size.width/height`を`useNetworkLayout`・`computeVisualScale`(ノード半径/ラベルのスケール算出、`nodeVisualScale`)に渡す。`activeAttacks`から`port_scan`の現在ターゲットID集合(`scanTargetIds`)と`ddos`進行中フラグ(`hasDdos`)を算出し、それぞれ`NodeView`の走査枠表示・背景の赤グローに反映する。加えて`ddosAttacks = activeAttacks.filter(a => a.type === 'ddos')`を算出し、SVG内の`AttackEffectsLayer`直後・`NodeView`群の直前に`<BotnetLayer attacks={ddosAttacks} positions={positions} width={size.width} height={size.height} />`を差し込む。SVG内で`<line>`によるリンク描画→`AttackEffectsLayer`→`BotnetLayer`→`NodeView`(`scale={nodeVisualScale}`を渡す)の順にレイヤリングし、その上に`ParticleCanvas`を完全重畳(`position:absolute`)で配置する。マップ本体エリア直下に`<AttackExplanation />`(z-30、攻撃実行中のリアルタイム解説カードをネットワーク図上部に重畳表示。props受け渡しなし)を配置する。既存の`hasDdos`背景グロー・`runDdos`ロジックは変更なし。
+- **下部コントロール領域**(`AttackToolbar`+`StatsPanel`、Phase2で構造を刷新): `lg`(1024px)以上は従来どおりマップ本体エリアと同じ親(ルート)に対し`lg:absolute lg:inset-x-4 lg:bottom-4 lg:z-20 lg:pointer-events-none`でマップ上に浮かせる(Phase1のz階層・`pointer-events-none`/`pointer-events-auto`構成をそのまま踏襲。この時マップ本体エリアはflex-1の唯一のフローの子になり実質100%を占めるため、見た目はPhase1から一切変わらない)。`lg`未満は`shrink-0`の通常フロー(`border-t border-slate-800/60 bg-slate-950/60 p-3`)でマップ本体エリアの下に実配置し、マップの上に何も重ねない(マップ本体エリアがflex-1で残り高さを丸ごと確保できるため、375×667で最低350px以上・実測約420pxのマップ表示領域を確保できる)。内側の行は`flex flex-col-reverse items-start gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4`(DOM順は`AttackToolbar`→`StatsPanel`のままだが、`flex-col-reverse`により`lg`未満では`StatsPanel`が上・`AttackToolbar`が下に見える。`lg`以上は`AttackToolbar`左/`StatsPanel`右、Phase1から変更なし)。中の2要素は常に`pointer-events-auto`。
 - ノード/リンクの位置計算とCanvas粒子描画は別ファイルに分離し、本ファイルはレイアウト・データ受け渡しのみを担当する。
 
-**依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、読み取り専用で`nodes`/`links`/`activeAttacks`)、`./useNetworkLayout`、`./ParticleCanvas`、`./NodeView`、`./AttackEffectsLayer`、`./BotnetLayer`、`./AttackToolbar`、`./AttackExplanation`、`../StatsPanel/StatsPanel`、`./constants`(`TRAFFIC_COLORS`)、`./networkMap.css`
+**依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、読み取り専用で`nodes`/`links`/`activeAttacks`)、`./useNetworkLayout`、`./ParticleCanvas`、`./NodeView`、`./AttackEffectsLayer`、`./BotnetLayer`、`./AttackToolbar`、`./AttackExplanation`、`../StatsPanel/StatsPanel`、`./constants`(`TRAFFIC_COLORS`, `computeVisualScale`)、`./networkMap.css`
 
 **このファイルを参照しているファイル**: `src/components/Layout/AppLayout.tsx`
 
@@ -188,9 +191,9 @@
 **主要な型・関数**:
 - `LayoutNode` interface — `d3.SimulationNodeDatum`を拡張し`id`/`type`を持つ、d3シミュレーション内部用のノード型。
 - `NodePosition` interface — `{ x: number; y: number }`。
-- `useNetworkLayout(nodes, links, width, height): Record<string, NodePosition>` — `nodes.length`/`width`/`height`が変化した時のみ`forceSimulation`を再構築(`useEffect`の依存配列を意図的に絞っている)。`tick`イベントでノード座標をビューポート内にクランプしつつ`positions`の`state`を更新する。`alphaDecay(0.04)`により収束後は自動的にtickが停止し負荷が限定される。サイズのみが変わった場合は別の`useEffect`で`forceCenter`を更新し`alpha(0.3)`で軽く再加熱する。
+- `useNetworkLayout(nodes, links, width, height): Record<string, NodePosition>` — `nodes.length`/`width`/`height`が変化した時のみ`forceSimulation`を再構築(`useEffect`の依存配列を意図的に絞っている)。**Phase2で`computeLayoutScale`/`computeVisualScale`(`./constants`)によるスケーリングを追加**: `forceLink.distance`は`120 * layoutScale`、`forceManyBody.strength`は`-260 * layoutScale`、`forceCollide`の半径は`NODE_RADIUS[type] * visualScale + 24 * layoutScale`。`layoutScale`/`visualScale`は`width >= 1024`(lgブレークポイント)では常に1を返すため、デスクトップでは従来の`120`/`-260`/`NODE_RADIUS+24`と完全一致する。`tick`イベントでは`margin = NODE_RADIUS[type] * visualScale + 30 * layoutScale`を算出し、`width < margin*2`(または`height < margin*2`)の場合は旧来のclamp式(`min`が先に効いて全ノードが同一座標に潰れるバグがあった)を使わず中央寄せ(`width/2`/`height/2`)にフォールバックしてから`positions`の`state`を更新する。`alphaDecay(0.04)`により収束後は自動的にtickが停止し負荷が限定される。サイズのみが変わった場合は別の`useEffect`で`forceCenter`を更新し`alpha(0.3)`で軽く再加熱する。
 
-**依存しているファイル**: `d3-force`(`node_modules/d3-force`に実体があるサブパッケージを直接import)、`../../types`(`NetworkNode`, `NetworkLink`)、`./constants`(`NODE_RADIUS`)
+**依存しているファイル**: `d3-force`(`node_modules/d3-force`に実体があるサブパッケージを直接import)、`../../types`(`NetworkNode`, `NetworkLink`)、`./constants`(`NODE_RADIUS`, `computeLayoutScale`, `computeVisualScale`)
 
 **このファイルを参照しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`、`src/components/NetworkMap/ParticleCanvas.tsx`(`NodePosition`型のみ)
 
@@ -214,7 +217,7 @@
 **役割**: 単一ノードのSVG描画。タイプごとの色分け、常時「鼓動」するアニメーション、感染時の波紋・オーラ・ジッター表現、Firewallの六角シールド常時表示、port_scanターゲット時の走査枠を担当する。
 
 **主要な型・関数**:
-- `NodeView({ node, x, y, isScanTarget })` (default export) — ルート`<g>`の直下(最初の子)にSVGネイティブの`<title>{`${NODE_DESCRIPTIONS[node.type].label}: ${NODE_DESCRIPTIONS[node.type].description}`}</title>`を配置し、ノードにマウスホバーするとブラウザ標準ツールチップで機器の役割を説明する(`<g>`には`style={{ cursor: 'help' }}`も付与)。`node.infected`が`true`の場合、感染オーラ(`motion.circle`の不透明度ループ)、3本の波紋リング(タイムラグ`0/0.6/1.2`秒でscale+opacityをループ)、本体の軽いジッター(x/yの微小振動)を重ねる。`node.type === 'firewall'`の場合、`hexagonPoints`で生成した六角形オーバーレイを常時薄く発光させる。`isScanTarget`が`true`の場合、黄色い走査枠を0.5秒だけフェード表示する。本体は`motion.circle`で`scale: [1, 1.06, 1]`の鼓動ループ(感染時は周期を短縮しジッター付与)。`node.health < 50`の場合は黒の半透明オーバーレイで損傷を表現。
+- `NodeView({ node, x, y, isScanTarget, scale = 1 })` (default export) — `scale`引数はPhase2で追加(既定1=デスクトップと同じ)。`radius = NODE_RADIUS[node.type] * scale`、ラベルの`fontSize = 11 * scale`を算出し、狭い画面(`computeVisualScale`の戻り値をNetworkMap側から渡す想定)ではノード半径・ラベル文字サイズを縮小する。`lg`(1024px)以上では呼び出し側の`scale`が常に1になるため、見た目はPhase1から変わらない。ルート`<g>`の直下(最初の子)にSVGネイティブの`<title>{`${NODE_DESCRIPTIONS[node.type].label}: ${NODE_DESCRIPTIONS[node.type].description}`}</title>`を配置し、ノードにマウスホバーするとブラウザ標準ツールチップで機器の役割を説明する(`<g>`には`style={{ cursor: 'help' }}`も付与)。`node.infected`が`true`の場合、感染オーラ(`motion.circle`の不透明度ループ)、3本の波紋リング(タイムラグ`0/0.6/1.2`秒でscale+opacityをループ)、本体の軽いジッター(x/yの微小振動)を重ねる(いずれも`radius`基準なので`scale`に自動的に追従する)。`node.type === 'firewall'`の場合、`hexagonPoints`で生成した六角形オーバーレイを常時薄く発光させる。`isScanTarget`が`true`の場合、黄色い走査枠を0.5秒だけフェード表示する。本体は`motion.circle`で`scale: [1, 1.06, 1]`の鼓動ループ(感染時は周期を短縮しジッター付与)。`node.health < 50`の場合は黒の半透明オーバーレイで損傷を表現。
 - `hexagonPoints(r: number): string` — 正六角形の頂点座標文字列を生成するヘルパー。
 
 **依存しているファイル**: `framer-motion`(`motion`)、`../../types`(`NetworkNode`)、`./constants`(`NODE_COLORS`, `NODE_RADIUS`, `INFECTED_COLOR`, `NODE_DESCRIPTIONS`)
@@ -257,14 +260,14 @@
 
 ## `src/components/NetworkMap/AttackToolbar.tsx`
 
-**役割**: 攻撃トリガーUI。半透明ツールバーに6種(Ping/Port Scan/SSH Brute Force/SQL Injection/DDoS/Ransomware)のボタンを表示し、クリックで`triggerAttack(type, sourceId, targetId)`を呼ぶ。**Phase1(UI重なり解消)で自前の絶対配置指定(`absolute bottom-4 left-4 z-10`)を撤去**し、`NetworkMap.tsx`側の下部オーバーレイ行の中に置かれる通常フローのボックス(`max-w-full flex flex-wrap ...`)に変更。ツールバーが横に伸びても隣の`StatsPanel`を侵食しないよう、親側の`min-w-0`と組み合わせてボタンが折り返す前提。
+**役割**: 攻撃トリガーUI。半透明ツールバーに6種(Ping/Port Scan/SSH Brute Force/SQL Injection/DDoS/Ransomware)のボタンを表示し、クリックで`triggerAttack(type, sourceId, targetId)`を呼ぶ。**Phase1(UI重なり解消)で自前の絶対配置指定を撤去**し、`NetworkMap.tsx`側の下部コントロール領域の中に置かれる通常フローのボックスに変更。**Phase2(スマホ対応)でマークアップを2系統に分割**: `lg`(1024px)以上は従来どおり`flex flex-wrap`で折り返すレイアウト(見た目は変更なし)、`lg`未満はSSH認証切替行・攻撃ボタン行をそれぞれ`overflow-x-auto`の横スクロール1行に圧縮する(マップの高さを圧迫しないため)。両マークアップは同一コンポーネントインスタンス内に共存し(`hidden`/`lg:hidden`の対で表示切替、非表示側も引き続きDOM上には存在する)、`sshAuthMethod`のstateと`handleClick`を共有するため、どちらの表示を操作しても選択状態は一致する。
 
 **主要な型・関数**:
 - `ATTACK_TYPES: AttackType[]` — ツールバーに表示する6種別の配列。
 - `TARGET_TYPE_PRIORITY: Record<AttackType, NodeType[]>` — 攻撃種別ごとに「ふさわしいターゲットtype」の優先順リストを定義(例: `ssh_bruteforce`→`['host','server']`、`ddos`→`['firewall','router']`)。
 - `findSource(nodes): NetworkNode | undefined` — `type === 'attacker'`の最初のノードを返す。
 - `findTarget(nodes, type): NetworkNode | undefined` — `TARGET_TYPE_PRIORITY`の優先順で該当typeのノードを探し、見つからなければ`nodes[0]`をfallbackとする。
-- `AttackToolbar({ nodes })` (default export) — `useState<SshAuthMethod>('password')`で`sshAuthMethod`を保持し、攻撃ボタン群の上に「SSH認証:」ラベル＋ピル型トグル(パスワード認証/公開鍵認証)を表示する。各攻撃ボタンには`title={`実在ツール: ${ATTACK_TOOLS[type]}`}`をネイティブツールチップとして付与。ボタンクリック時に`findSource`/`findTarget`で`sourceId`/`targetId`を解決し、`ssh_bruteforce`の場合のみ`triggerAttack(type, source.id, target.id, sshAuthMethod)`(それ以外は`triggerAttack(type, source.id, target.id)`)を呼ぶ。
+- `AttackToolbar({ nodes })` (default export) — `useState<SshAuthMethod>('password')`で`sshAuthMethod`を保持する。`handleClick(type)`が`findSource`/`findTarget`で`sourceId`/`targetId`を解決し、`ssh_bruteforce`の場合のみ`triggerAttack(type, source.id, target.id, sshAuthMethod)`(それ以外は`triggerAttack(type, source.id, target.id)`)を呼ぶ。SSH認証切替(パスワード認証/公開鍵認証)と6攻撃ボタンを、`lg`未満用(横スクロール、ボタンは`min-h-11`でタップ領域44px確保)と`lg`以上用(折り返し、Phase1から変更なし)の2セットのマークアップとして描画する。各攻撃ボタンには`title={`実在ツール: ${ATTACK_TOOLS[type]}`}`をネイティブツールチップとして付与(両マークアップ共通)。
 
 **依存しているファイル**: `../../engine/simulationEngine`(`triggerAttack`。任意第4引数`authMethod`にも対応)、`../../types`(`AttackType`, `NetworkNode`, `SshAuthMethod`)、`./constants`(`ATTACK_LABELS`, `ATTACK_TOOLS`)
 
@@ -300,6 +303,8 @@
 - `ATTACK_COLORS: Record<AttackType, string>` — 攻撃種別ごとの演出色。
 - `ATTACK_TOOLS: Record<AttackType, string>` — 各攻撃に対応する実在ツール名(現実との接続用)。`ping`='hping3 / ICMP Echo', `port_scan`='Nmap / Masscan', `ssh_bruteforce`='Hydra / Medusa', `sql_injection`='sqlmap', `ddos`='Mirai(ボットネット) / LOIC', `ransomware`='WannaCry / LockBit'。`AttackToolbar.tsx`のボタンツールチップ(`title`属性)に使用。
 - `ATTACK_DESCRIPTIONS: Record<AttackType, { summary: string; whatYouSee: string }>` — 攻撃実行中のリアルタイム解説パネル(`AttackExplanation.tsx`)用。各攻撃種別の「何をする攻撃か」(`summary`)と「今画面で見えているもの」(`whatYouSee`)を日本語で保持する。
+- `computeLayoutScale(width, height): number` (Phase2で追加) — `d3-force`の距離/反発力/衝突半径・marginに掛けるスケール。幅が`lg`ブレークポイント(1024px)以上のときは常に1を返し、デスクトップの見た目を一切変えない。それ未満のときのみ短辺(`Math.min(width, height)`)を基準(640px)に0.5〜1の範囲で縮小する。
+- `computeVisualScale(width, height): number` (Phase2で追加) — ノード半径・ラベルのフォントサイズに掛けるスケール。`computeLayoutScale`と同じ基準だが、読めなくならないよう下限を0.75にクランプする。
 
 **依存しているファイル**: `../../types`(`NodeType`, `TrafficType`, `AttackType`)
 
@@ -357,7 +362,7 @@
 **主要な型・関数**:
 - `MarkerPosition` interface — `{ event: TimelineEvent, leftPx: number, elapsedSec: number }`。1イベントの描画位置情報。
 - `buildMarkerPositions(timeline: TimelineEvent[]): MarkerPosition[]` — `timeline`配列の先頭要素の`timestamp`を基準(0秒)とし、各イベントの経過秒数(`elapsedSec`)と、それに`PIXELS_PER_SECOND`(40px/秒)を掛けて左パディング(`TRACK_PADDING`=24px)を加えたピクセル位置(`leftPx`)を算出。配列が空の場合は空配列を返す。
-- `TimelineMarker({ position }: { position: MarkerPosition })` — 1イベント分のマーカー。`kind`ごとの色・グロー・アイコンは`getKindStyle`から取得。`motion.div`で`initial={{opacity:0,x:24,scale:0.6}} → animate={{opacity:1,x:0,scale:1}}`のスライドイン+フェードイン+スケールアニメーション。`title`属性に加え、`group-hover`で表示される独自ツールチップ(発生時刻・経過秒・種別ラベル・本文)をCSSのみで実装。
+- `TimelineMarker({ position }: { position: MarkerPosition })` — 1イベント分のマーカー。`kind`ごとの色・グロー・アイコンは`getKindStyle`から取得。`motion.div`で`initial={{opacity:0,x:24,scale:0.6}} → animate={{opacity:1,x:0,scale:1}}`のスライドイン+フェードイン+スケールアニメーション。`title`属性に加え、`group-hover`で表示される独自ツールチップ(発生時刻・経過秒・種別ラベル・本文)をCSSのみで実装。マーカーの丸(`h-4 w-4`=16px)自体の見た目・イベント間隔は**Phase2でも変更していない**(イベントが密集する場面で実ボックスを44pxに広げると隣接マーカー同士が視覚的に重なってしまうため)。代わりに`relative`+`before:absolute before:-inset-[14px] before:content-['']`で当たり判定のみ44px相当(16+14×2)に透明拡張している(レイアウトに寄与しない`absolute`疑似要素なので周囲のマーカー間隔は変わらない)。マーカー自体はクリックハンドラを持たない装飾+ホバーツールチップのみのため、拡張ヒット領域同士が重なっても機能的な誤操作は発生しない。
 - `Timeline()` (default export) — ルートコンポーネント。`useMemo`で`positions`(`buildMarkerPositions`の結果)と`trackWidth`(最後のマーカー位置+両端パディング、最低`MIN_TRACK_WIDTH`=600pxを保証)を算出。`scrollRef`+`useEffect`で`timeline.length`変化時に`el.scrollLeft = el.scrollWidth`を実行し、新規イベント追加時に常に最新(右端)が見えるようにする。ヘッダーに「タイムライン」タイトルとイベント総数バッジを表示。0件時は空状態メッセージ(「まだイベントはありません」)を表示。トラック本体は`absolute`配置された横長バー(`bg-slate-800/60`)の上に、`AnimatePresence`でラップした`TimelineMarker`群を重ねる構成。
 
 **定数**: `PIXELS_PER_SECOND = 40`(経過時間→ピクセル変換係数)、`MIN_TRACK_WIDTH = 600`(トラックの最低幅)、`TRACK_PADDING = 24`(トラック左右の余白)
@@ -385,14 +390,16 @@
 
 ## `src/components/StatsPanel/StatsPanel.tsx`
 
-**役割**: 統計HUDパネル本体。`useSimulationStore`から`stats`(読み取り専用)を取得し、CPU/Memory/Networkをバーゲージ(`GaugeBar`)、Attack Scoreをカウンター(`AttackScoreCounter`)として表示する。**Phase1(UI重なり解消)でNetworkMap内の下部オーバーレイ行(`AttackToolbar`と左右に並ぶ)に配置される前提に変更**(旧: AppLayout側で`absolute bottom-4 right-4`配置)。本コンポーネント自身は位置指定を持たず、カードの見た目(サイズ・ガラスモーフィズム背景・枠線・shadow)のみを担う点は変更なし。
+**役割**: 統計HUDパネル本体。`useSimulationStore`から`stats`(読み取り専用)を取得する。**Phase1(UI重なり解消)でNetworkMap内の下部コントロール領域(`AttackToolbar`と並ぶ)に配置される前提に変更**(旧: AppLayout側で`absolute bottom-4 right-4`配置)。本コンポーネント自身は位置指定を持たない。**Phase2(スマホ対応)でマークアップを2系統に分割**: `lg`(1024px)未満では縦積みカードだとマップの高さを大きく奪う(実測400px超)ため、CPU/MEM/NET/SCOREを横1行に並べる簡略版(`CompactStat`、ラベル+数値のみ、高さ目安60px)を表示する。`lg`以上は従来どおりCPU/Memory/Networkをバーゲージ(`GaugeBar`)、Attack Scoreをカウンター(`AttackScoreCounter`)で縦積み表示するカード(見た目・幅`w-64`ともに変更なし)。両マークアップは同一コンポーネントインスタンス内に共存し(`lg:hidden`/`hidden lg:block`の対で表示切替)、`stats`の購読は1箇所のみなので状態はどちらの表示でも一致する。
 
 **主要な型・関数**:
-- `StatsPanel()` (default export) — ルートコンポーネント。`w-64`のガラスモーフィズムカード(`bg-slate-900/70 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-lg shadow-black/40`)。`motion.div`の`opacity`を`[0.96, 1, 0.96]`の範囲で4秒周期にゆるく往復させ、常時稼働している印象(breathe効果)を出す。ヘッダーに`animate-ping`を使ったライブ表示ドット+「System Stats」見出し。内部に`<GaugeBar label="CPU" value={stats.cpu} />`/`Memory`/`Network`の3本と、区切り線、`<AttackScoreCounter value={stats.attackScore} />`を縦に並べる。
+- `CompactStat({ label, value, highlight })` (非export) — `lg`未満のコンパクト表示1項目。ラベル(極小・大文字・グレー)の下に数値(太字、`highlight`が真の場合は赤)を表示する縦積みの小さなブロック。
+- `COMPACT_WARNING_THRESHOLD = 50` — コンパクト表示でAttack Scoreを`highlight`(赤字)にする閾値。`AttackScoreCounter.tsx`の`WARNING_THRESHOLD`と同値。
+- `StatsPanel()` (default export) — ルートコンポーネント。`lg`未満: `CompactStat`を4つ(CPU/MEM/NET/SCORE)横並びにした1行のガラスモーフィズムバー。`lg`以上: `w-64`のガラスモーフィズムカード(`bg-slate-900/70 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-lg shadow-black/40`)。`motion.div`の`opacity`を`[0.96, 1, 0.96]`の範囲で4秒周期にゆるく往復させ、常時稼働している印象(breathe効果)を出す。ヘッダーに`animate-ping`を使ったライブ表示ドット+「System Stats」見出し。内部に`<GaugeBar label="CPU" value={stats.cpu} />`/`Memory`/`Network`の3本と、区切り線、`<AttackScoreCounter value={stats.attackScore} />`を縦に並べる。
 
 **依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、`stats`のみ読み取り)、`./GaugeBar`、`./AttackScoreCounter`、`framer-motion`(`motion`)
 
-**このファイルを参照しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`(下部オーバーレイ行内で`AttackToolbar`と左右に並べて配置)
+**このファイルを参照しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`(下部コントロール領域内で`AttackToolbar`と並べて配置)
 
 ---
 
