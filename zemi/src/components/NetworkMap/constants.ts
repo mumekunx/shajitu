@@ -34,7 +34,8 @@ export const NODE_RADIUS: Record<NodeType, number> = {
 };
 
 /** Phase2: 狭い画面向けにd3-forceのレイアウトパラメータ・ノード半径・ラベルを段階的に縮小するためのスケール計算。
- * `lg`ブレークポイント(1024px)未満のコンテナ幅でのみ働く基準値。それ以上ではdesktop表示を一切変えない。 */
+ * デスクトップ(ビューポート幅1024px以上)かどうかは呼び出し側の`useMediaQuery`で判定するため、
+ * 通常の呼び出し経路ではこの定数のガードには到達しない(念のためのフォールバック値)。 */
 const MOBILE_LAYOUT_BREAKPOINT = 1024;
 /** この短辺(px)以上ではスケール1(従来値)扱いにする基準値 */
 const MOBILE_REFERENCE_EXTENT = 640;
@@ -45,8 +46,12 @@ const VISUAL_MIN_SCALE = 0.75;
 
 /**
  * d3-forceの距離/反発力/衝突半径・marginに掛けるスケール。
- * 幅が`lg`ブレークポイント(1024px)以上のときは常に1を返し、デスクトップの見た目を一切変えない。
- * それ未満のときのみ、短辺(width/heightの小さい方)を基準に0.5〜1の範囲で縮小する。
+ * デスクトップ判定(`lg`ブレークポイント、ビューポート幅1024px以上)は呼び出し側が
+ * `useMediaQuery(DESKTOP_MEDIA_QUERY)`で行い、デスクトップでは呼び出し側がこの関数自体を
+ * 呼ばず`1`を固定で使う。この関数が受け取る`width`はマップコンテナの実測幅(サイドバー等を
+ * 除いた値)であり、ビューポート幅とは一致しない(ビューポート1024pxでもコンテナはそれより
+ * 狭い)ため、ここでの閾値判定はデスクトップ判定としては機能しない。以下の分岐は関数を
+ * 直接使う場合の暴走防止(念のためのガード)として残す。
  */
 export function computeLayoutScale(width: number, height: number): number {
   if (width >= MOBILE_LAYOUT_BREAKPOINT) return 1;

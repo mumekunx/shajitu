@@ -51,6 +51,18 @@
 - `npx oxlint src`成功(エラーなし)。
 - `zemi/detail.md`の該当エントリ(`AppLayout.tsx`/`NetworkMap.tsx`/`useNetworkLayout.ts`/`constants.ts`/`NodeView.tsx`/`AttackToolbar.tsx`/`StatsPanel.tsx`/`Timeline.tsx`/`WelcomeOverlay.tsx`)を最新実装に合わせて更新済み。
 
+**Codexレビュー結果と対応**(Phase2完了後に実施):
+- **blocker 1件(修正済み)**: スケール判定がビューポート幅ではなくマップ「コンテナ」実寸ベースだった。`NetworkMap.tsx`は`ResizeObserver`で測ったコンテナ幅/高さを`computeLayoutScale`/`computeVisualScale`にそのまま渡していたため、コンテナ幅はサイドバー(320px)やタイムラインを除いた値になり、ビューポート1024px(=CSSの`lg`)でもコンテナは約704×608pxとなり`scale`が0.95等になっていた(デスクトップでもノード配置・半径・フォントがPhase1から変わっていた)。**対応**: `src/hooks/useMediaQuery.ts`を新規追加(`window.matchMedia('(min-width: 1024px)')`を購読する汎用フック+`DESKTOP_MEDIA_QUERY`定数)。`NetworkMap.tsx`と`useNetworkLayout.ts`(第5引数`isDesktop`を追加)の両方でこのフックを使い、`isDesktop === true`の間はコンテナ実寸を一切見ずに`layoutScale`/`visualScale`を`1`固定にした。`constants.ts`の`computeLayoutScale`内に残る「幅1024px以上なら1を返す」ガードは、呼び出し側がビューポート判定を行うようになったため実質的なデスクトップ判定としては機能しない旨をコメントで明記した(念のためのフォールバックとして関数自体は残す)。
+- **should 4件(いずれも修正済み)**:
+  1. `AppLayout.tsx`のルート要素の`h-[100dvh]`が`lg`以上にも効いており、Phase1の`h-screen`(100vh)と挙動が変わっていた。`h-[100dvh] lg:h-screen`にし、`lg`以上ではPhase1と同じ`100vh`に戻した。
+  2. `Timeline.tsx`のマーカーの当たり判定拡張(`before:-inset-[14px]`)に`lg`の打ち消しがなく、デスクトップでもホバー/ツールチップの発火範囲が16px→44pxに広がっていた。`lg:before:inset-0`を追加し、`lg`以上では疑似要素を実ボックスと一致させてPhase1の挙動に戻した。
+  3. `AppLayout.tsx`のモバイル用タブバーのARIA tabパターンが未完成だった。各タブに一意な`id`と対応ペインを指す`aria-controls`、各ペインに`role="tabpanel"`/`aria-labelledby`/`id`、ロービングフォーカス(選択中のみ`tabIndex=0`)、左右矢印キーでのタブ移動(端で折り返し、フォーカスも移動)を追加した。`lg`以上のデスクトップ3ペインレイアウトのセマンティクスを壊さないよう、`role="tabpanel"`は`useMediaQuery`による`isDesktop`判定で出し分け、`lg`以上では一切付与しない(`mobilePanelAttrs`ヘルパー)ようにした。
+  4. `ParticleCanvas.tsx`が`requestAnimationFrame`ループを常時回しており、モバイルでマップタブが非選択(`invisible`)の間もCPU/バッテリーを消費していた。`active`プロパティを追加し(`AppLayout.tsx`→`NetworkMap.tsx`→`ParticleCanvas.tsx`と伝播。`lg`以上は常に`true`でデスクトップでは絶対に停止しない、`lg`未満はmapタブ選択時のみ`true`)、`false`の間は`rAF`を起動せず既存ループもクリーンアップでキャンセルするようにした。`particleSystem`自体の状態は外部シングルトンが保持するため、再度`true`になった際も見た目は壊れず自然に再開する。
+- **nice 1件(見送り)**: `computeLayoutScale`/`computeVisualScale`に`Number.isFinite`等の`NaN`ガードを追加してはどうかという指摘があったが、通常の`ResizeObserver`経路(`width`/`height`は常に数値)では`NaN`に到達しないため見送った。
+- **Codexが「問題なし」と確認した点**: `ResizeObserver`の`disconnect`、d3-forceの`sim.stop()`、`WelcomeOverlay`のcontrolled化、モバイル/デスクトップ2系統マークアップ間の重複`id`なし、いずれも既存実装のままで問題なし。
+- 確認: `npm run build`(`tsc -b && vite build`)成功、`npx oxlint src`成功(エラーなし)。デスクトップ不変性は`useMediaQuery(DESKTOP_MEDIA_QUERY)`によるビューポート幅ベースの判定で担保し、`isDesktop === true`の間は`layoutScale`/`visualScale`/`nodeVisualScale`が常に`1`、`ParticleCanvas`の`active`は常に`true`になることをコードレベルで保証した。
+- 影響範囲(追加): `src/hooks/useMediaQuery.ts`(新規)、`src/components/Layout/AppLayout.tsx`、`src/components/NetworkMap/NetworkMap.tsx`、`src/components/NetworkMap/useNetworkLayout.ts`、`src/components/NetworkMap/constants.ts`(コメントのみ)、`src/components/NetworkMap/ParticleCanvas.tsx`、`src/components/Timeline/Timeline.tsx`
+
 ## 2026-07-23 — 公開URL固定化とdist更新漏れ対策
 **立案**: 公開URL https://mumekunx.github.io/shajitu/zemi/dist/ を今後絶対に変えず、かつ `zemi/dist/` の更新をコミットし続けられる状態にする。
 - 実装方針:

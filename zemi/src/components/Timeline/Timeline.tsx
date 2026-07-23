@@ -47,9 +47,11 @@ function TimelineMarker({ position }: { position: MarkerPosition }) {
     >
       <div className="relative flex flex-col items-center">
         {/* h-4 w-4(16px)の見た目は維持しつつ、before疑似要素で当たり判定のみ44px相当に拡張する
-            (16px + 14px*2 = 44px)。レイアウトには寄与しないabsolute配置なので周囲のマーカー間隔は変わらない */}
+            (16px + 14px*2 = 44px)。レイアウトには寄与しないabsolute配置なので周囲のマーカー間隔は変わらない。
+            lg以上はlg:before:inset-0で疑似要素を実ボックスと一致させ、ホバー/ツールチップの発火範囲が
+            44pxに広がらないようにする(Phase1のデスクトップ挙動に戻す)。 */}
         <span
-          className={`relative flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none text-slate-950 before:absolute before:-inset-[14px] before:content-[''] ${style.dotClass} ${style.glowClass}`}
+          className={`relative flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none text-slate-950 before:absolute before:-inset-[14px] before:content-[''] lg:before:inset-0 ${style.dotClass} ${style.glowClass}`}
         >
           {style.icon}
         </span>

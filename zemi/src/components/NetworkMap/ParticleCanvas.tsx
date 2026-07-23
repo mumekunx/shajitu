@@ -9,6 +9,11 @@ interface ParticleCanvasProps {
   height: number;
   links: NetworkLink[];
   positions: Record<string, NodePosition>;
+  /** falseの間はrAFループを開始しない(既に走っていれば停止する)。既定はtrue。
+   * 非表示ペイン(lg未満でmapタブが非選択)でのCPU/バッテリー消費を避けるために使う。
+   * particleSystem自体の状態(このコンポーネント外で管理)は失われないため、再度true
+   * になれば直前の粒子状態から描画を再開する。 */
+  active?: boolean;
 }
 
 /**
@@ -17,7 +22,7 @@ interface ParticleCanvasProps {
  * 毎フレーム particleSystem.getParticles() を読んで描画するだけのコンポーネント。
  * React の再レンダリングは発生させない(ref 経由で直接 canvas に描く)。
  */
-export default function ParticleCanvas({ width, height, links, positions }: ParticleCanvasProps) {
+export default function ParticleCanvas({ width, height, links, positions, active = true }: ParticleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // 最新の links / positions を rAF ループから参照するための ref(再レンダリング無しで読む)
   const linksRef = useRef(links);
@@ -75,9 +80,14 @@ export default function ParticleCanvas({ width, height, links, positions }: Part
       rafId = requestAnimationFrame(render);
     };
 
-    rafId = requestAnimationFrame(render);
+    // activeがfalseの間はループを開始しない。activeがtrue→falseに変わった時は
+    // このeffectが再実行され、クリーンアップで直前のrAFをキャンセルしてから
+    // 新しい実行(このブロック)ではrequestAnimationFrameを呼ばないため、ループが止まる。
+    if (active) {
+      rafId = requestAnimationFrame(render);
+    }
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [active]);
 
   return (
     <canvas

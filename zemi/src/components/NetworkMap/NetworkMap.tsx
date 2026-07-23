@@ -9,7 +9,15 @@ import AttackToolbar from './AttackToolbar';
 import AttackExplanation from './AttackExplanation';
 import StatsPanel from '../StatsPanel/StatsPanel';
 import { TRAFFIC_COLORS, computeVisualScale } from './constants';
+import { useMediaQuery, DESKTOP_MEDIA_QUERY } from '../../hooks/useMediaQuery';
 import './networkMap.css';
+
+interface NetworkMapProps {
+  /** このペインが現在ユーザーに見えているか(lg未満のタブ切替でmapタブが非選択の間はfalse)。
+   * lg以上では呼び出し側(AppLayout)が常にtrueを渡す想定。ParticleCanvasのrAFループの
+   * 起動/停止にのみ使う。省略時はtrue扱い(誤って停止しない安全側デフォルト)。 */
+  active?: boolean;
+}
 
 /**
  * NetworkMap: メインビジュアル。
@@ -17,13 +25,17 @@ import './networkMap.css';
  * - 粒子(数百個規模)は Canvas 2D(ParticleCanvas)で独立に描画
  * - 攻撃トリガーUIと攻撃別エフェクトのオーバーレイを重畳する
  */
-export default function NetworkMap() {
+export default function NetworkMap({ active = true }: NetworkMapProps) {
   const nodes = useSimulationStore((state) => state.nodes);
   const links = useSimulationStore((state) => state.links);
   const activeAttacks = useSimulationStore((state) => state.activeAttacks);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  // CSSの`lg`ブレークポイントと完全に一致させたデスクトップ判定(ビューポート幅>=1024px)。
+  // ResizeObserverで測るのはサイドバー等を除いたマップ「コンテナ」の実寸であり、
+  // ビューポート1024pxでもコンテナはそれより狭くなるため、スケール判定には使えない。
+  const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -38,9 +50,10 @@ export default function NetworkMap() {
     return () => observer.disconnect();
   }, []);
 
-  const positions = useNetworkLayout(nodes, links, size.width, size.height);
-  // Phase2: 狭い画面向けにノード半径・ラベルを縮小するスケール(lg以上=1024px幅以上では常に1)
-  const nodeVisualScale = computeVisualScale(size.width, size.height);
+  const positions = useNetworkLayout(nodes, links, size.width, size.height, isDesktop);
+  // Phase2: 狭い画面向けにノード半径・ラベルを縮小するスケール。
+  // isDesktopがtrueの間は常に1を固定で使い、コンテナ実寸に依存させない(デスクトップ不変性の担保)。
+  const nodeVisualScale = isDesktop ? 1 : computeVisualScale(size.width, size.height);
 
   // port_scan の現在のターゲットノードIDを集める(走査線エフェクト用)
   const scanTargetIds = new Set(
@@ -116,7 +129,13 @@ export default function NetworkMap() {
             </svg>
 
             {/* 粒子(Canvas 2D、SVGと完全に重畳配置) */}
-            <ParticleCanvas width={size.width} height={size.height} links={links} positions={positions} />
+            <ParticleCanvas
+              width={size.width}
+              height={size.height}
+              links={links}
+              positions={positions}
+              active={active}
+            />
           </>
         )}
 

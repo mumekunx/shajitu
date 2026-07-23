@@ -31,7 +31,8 @@ export function useNetworkLayout(
   nodes: NetworkNode[],
   links: NetworkLink[],
   width: number,
-  height: number
+  height: number,
+  isDesktop: boolean
 ) {
   const [positions, setPositions] = useState<Record<string, NodePosition>>({});
   const simRef = useRef<Simulation<LayoutNode, undefined> | null>(null);
@@ -50,9 +51,11 @@ export function useNetworkLayout(
     }));
 
     // Phase2: 狭い画面(lg未満)向けにパラメータを縮小するスケール。
-    // width >= 1024 では常に1(従来値と完全一致)。
-    const layoutScale = computeLayoutScale(width, height);
-    const visualScale = computeVisualScale(width, height);
+    // isDesktop(ビューポート幅1024px以上)では常に1(従来値と完全一致)。
+    // width/heightはマップコンテナの実測値でありビューポート幅とは一致しないため、
+    // デスクトップ判定にはcomputeLayoutScale/computeVisualScale内部の閾値ではなくisDesktopを使う。
+    const layoutScale = isDesktop ? 1 : computeLayoutScale(width, height);
+    const visualScale = isDesktop ? 1 : computeVisualScale(width, height);
 
     const linkForce = forceLink<LayoutNode, { source: string; target: string }>(
       links.map((l) => ({ source: l.source, target: l.target }))
@@ -93,7 +96,7 @@ export function useNetworkLayout(
     };
     // links は初期トポロジでほぼ固定の想定。nodes の id 集合が変わった時のみ再構築する。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes.length, width, height]);
+  }, [nodes.length, width, height, isDesktop]);
 
   // 画面サイズが変わったら center force を更新して軽く再加熱する
   useEffect(() => {
