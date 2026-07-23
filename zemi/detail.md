@@ -139,26 +139,43 @@
 
 ## `src/components/Layout/AppLayout.tsx`
 
-**役割**: 画面全体のグリッド/フレックスレイアウトシェル。左=NetworkMap、右=EventLog、下=Timeline、NetworkMap内右下にStatsPanelをHUDとして重ねる構成。
+**役割**: 画面全体のグリッド/フレックスレイアウトシェル。左=NetworkMap、右=EventLog、下=Timeline。`WelcomeOverlay`の開閉state(`welcomeOpen`)をここで保持しcontrolled化する(起動ボタンとモーダル本体を構造的に分離するため)。StatsPanelは(Phase1の変更で)NetworkMap側に移動し、本コンポーネントはもう持たない。
 
 **主要な型・メソッド**:
-- `export default function AppLayout()` — 唯一のexport。Propsなし
+- `export default function AppLayout()` — 唯一のexport。Propsなし。マップ領域ラッパ(`relative isolate flex-1`)に`isolate`を付与し、マップ内のz-indexをこのスコープに閉じ込める。`welcomeOpen`が`false`の間だけマップ領域ラッパ内に`WelcomeOverlayLauncher`(「?」起動ボタン)を配置し、`WelcomeOverlay`本体はルート直下(`isolate`スコープの外)に`fixed inset-0 z-50`のまま配置する。
 
-**依存しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`, `src/components/EventLog/EventLog.tsx`, `src/components/Timeline/Timeline.tsx`, `src/components/StatsPanel/StatsPanel.tsx`
+**依存しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`, `src/components/EventLog/EventLog.tsx`, `src/components/Timeline/Timeline.tsx`, `src/components/Onboarding/WelcomeOverlay.tsx`(`WelcomeOverlay`, `WelcomeOverlayLauncher`)
 
 **このファイルを参照しているファイル**: `src/App.tsx`
 
 ---
 
-## `src/components/NetworkMap/NetworkMap.tsx`
+## `src/components/Onboarding/WelcomeOverlay.tsx`
 
-**役割**: メインビジュアル本体。背景グリッド、SVGによるリンク/ノード/攻撃エフェクトの描画、Canvas 2Dによる粒子描画、攻撃トリガーツールバーを統合する。`useSimulationStore`から`nodes`/`links`/`activeAttacks`を読み取り専用で参照する。**Phase3で実装完了**。
+**役割**: 起動時に表示するウェルカム＆操作ガイドのモーダルオーバーレイ。初見者向けに「これは何か/画面の見方/やってみよう/注記」を説明する。store/型/エンジンには一切依存しない、純粋なUIコンポーネント。**Phase1(UI重なり解消)で「モーダル本体」と「起動ボタン」の2エクスポートに分離**し、`open` stateを`AppLayout`に持ち上げてcontrolled化した(旧: 自身が`useState`で`open`を保持し、モーダルと「?」起動ボタンの両方を1コンポーネント内で描画していた)。
 
 **主要な型・関数**:
-- `NetworkMap()` (default export) — ルートコンポーネント。`ResizeObserver`でコンテナのピクセルサイズ(`size.width/height`)を測定し、`useNetworkLayout`にサイズと`nodes`/`links`を渡してノード位置(`positions`)を取得する。`activeAttacks`から`port_scan`の現在ターゲットID集合(`scanTargetIds`)と`ddos`進行中フラグ(`hasDdos`)を算出し、それぞれ`NodeView`の走査枠表示・背景の赤グローに反映する。加えて`ddosAttacks = activeAttacks.filter(a => a.type === 'ddos')`を算出し、SVG内の`AttackEffectsLayer`直後・`NodeView`群の直前に`<BotnetLayer attacks={ddosAttacks} positions={positions} width={size.width} height={size.height} />`を差し込む。SVG内で`<line>`によるリンク描画→`AttackEffectsLayer`→`BotnetLayer`→`NodeView`の順にレイヤリングし、その上に`ParticleCanvas`を完全重畳(`position:absolute`)で配置する。位置指定コンテナ直下・`AttackToolbar`の直前に`<AttackExplanation />`を配置し、攻撃実行中のリアルタイム解説カードをネットワーク図上部に重畳表示する(props受け渡しなし、`AttackExplanation`が自前で`activeAttacks`を購読)。既存の`hasDdos`背景グロー・`runDdos`ロジックは変更なし。
+- `NODE_TYPE_ORDER: NodeType[]` — 「登場する機器」節での表示順(通信の流れが分かる順)。
+- `WelcomeOverlayProps` interface — `{ open: boolean; onClose: () => void }`。
+- `WelcomeOverlay({ open, onClose })` (default export) — モーダル本体のみを描画する。`open`中は`Escape`キーで`onClose`を呼ぶ`keydown`リスナーを登録(クリーンアップ付き)。`fixed inset-0 z-50`の背景オーバーレイ(クリックで`onClose`)+中央の`role="dialog"`カード(内容は不変: 説明文/画面の見方/登場する機器一覧/やってみよう/注記/「始める」ボタン、いずれも`onClose`を呼ぶ)。
+- `WelcomeOverlayLauncher({ onOpen })` (named export、新規) — 「?」起動ボタンのみを描画する。呼び出し側(`AppLayout`)が`open === false`の時だけ条件付きでマウントする。`absolute right-4 top-4 z-40`でマップ領域ラッパ内に配置される前提(旧: 自身が`fixed right-4 top-4 z-50`でビューポート右上に固定されており、右サイドバー(EventLogヘッダー)と衝突していた)。
+
+**依存しているファイル**: `framer-motion`(`AnimatePresence`, `motion`)、`../NetworkMap/constants`(`NODE_COLORS`, `NODE_DESCRIPTIONS`)、`../../types`(`NodeType`)
+
+**このファイルを参照しているファイル**: `src/components/Layout/AppLayout.tsx`(`open` stateを保持し、`WelcomeOverlay`と`WelcomeOverlayLauncher`の両方に渡す)
+
+---
+
+## `src/components/NetworkMap/NetworkMap.tsx`
+
+**役割**: メインビジュアル本体。背景グリッド、SVGによるリンク/ノード/攻撃エフェクトの描画、Canvas 2Dによる粒子描画、攻撃トリガーツールバー+統計パネルを統合する。`useSimulationStore`から`nodes`/`links`/`activeAttacks`を読み取り専用で参照する。**Phase3で実装完了、Phase1(UI重なり解消)でStatsPanelを統合**。
+
+**主要な型・関数**:
+- `NetworkMap()` (default export) — ルートコンポーネント。`ResizeObserver`でコンテナのピクセルサイズ(`size.width/height`)を測定し、`useNetworkLayout`にサイズと`nodes`/`links`を渡してノード位置(`positions`)を取得する。`activeAttacks`から`port_scan`の現在ターゲットID集合(`scanTargetIds`)と`ddos`進行中フラグ(`hasDdos`)を算出し、それぞれ`NodeView`の走査枠表示・背景の赤グローに反映する。加えて`ddosAttacks = activeAttacks.filter(a => a.type === 'ddos')`を算出し、SVG内の`AttackEffectsLayer`直後・`NodeView`群の直前に`<BotnetLayer attacks={ddosAttacks} positions={positions} width={size.width} height={size.height} />`を差し込む。SVG内で`<line>`によるリンク描画→`AttackEffectsLayer`→`BotnetLayer`→`NodeView`の順にレイヤリングし、その上に`ParticleCanvas`を完全重畳(`position:absolute`)で配置する。位置指定コンテナ直下に`<AttackExplanation />`(z-30、攻撃実行中のリアルタイム解説カードをネットワーク図上部に重畳表示。props受け渡しなし)を配置する。既存の`hasDdos`背景グロー・`runDdos`ロジックは変更なし。
+- 下部オーバーレイ行(`pointer-events-none absolute inset-x-4 bottom-4 z-20 flex items-end justify-between`)を1本新設し、その中に`AttackToolbar`(左、`pointer-events-auto min-w-0`)と`StatsPanel`(右、`pointer-events-auto shrink-0`)を同じ親として左右に並べる。旧構成では`AttackToolbar`(NetworkMap側)と`StatsPanel`(旧AppLayout側)が別々の親から画面下部に絶対配置されていて重なっていたため、両者を1つの親にまとめることで構造的に重なり得ない形にした。行自体は`pointer-events-none`でマップのクリックを奪わないようにし、中の2要素だけ`pointer-events-auto`で操作可能にする。
 - ノード/リンクの位置計算とCanvas粒子描画は別ファイルに分離し、本ファイルはレイアウト・データ受け渡しのみを担当する。
 
-**依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、読み取り専用で`nodes`/`links`/`activeAttacks`)、`./useNetworkLayout`、`./ParticleCanvas`、`./NodeView`、`./AttackEffectsLayer`、`./BotnetLayer`、`./AttackToolbar`、`./AttackExplanation`、`./constants`(`TRAFFIC_COLORS`)、`./networkMap.css`
+**依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、読み取り専用で`nodes`/`links`/`activeAttacks`)、`./useNetworkLayout`、`./ParticleCanvas`、`./NodeView`、`./AttackEffectsLayer`、`./BotnetLayer`、`./AttackToolbar`、`./AttackExplanation`、`../StatsPanel/StatsPanel`、`./constants`(`TRAFFIC_COLORS`)、`./networkMap.css`
 
 **このファイルを参照しているファイル**: `src/components/Layout/AppLayout.tsx`
 
@@ -240,7 +257,7 @@
 
 ## `src/components/NetworkMap/AttackToolbar.tsx`
 
-**役割**: 攻撃トリガーUI。半透明ツールバーに6種(Ping/Port Scan/SSH Brute Force/SQL Injection/DDoS/Ransomware)のボタンを表示し、クリックで`triggerAttack(type, sourceId, targetId)`を呼ぶ。
+**役割**: 攻撃トリガーUI。半透明ツールバーに6種(Ping/Port Scan/SSH Brute Force/SQL Injection/DDoS/Ransomware)のボタンを表示し、クリックで`triggerAttack(type, sourceId, targetId)`を呼ぶ。**Phase1(UI重なり解消)で自前の絶対配置指定(`absolute bottom-4 left-4 z-10`)を撤去**し、`NetworkMap.tsx`側の下部オーバーレイ行の中に置かれる通常フローのボックス(`max-w-full flex flex-wrap ...`)に変更。ツールバーが横に伸びても隣の`StatsPanel`を侵食しないよう、親側の`min-w-0`と組み合わせてボタンが折り返す前提。
 
 **主要な型・関数**:
 - `ATTACK_TYPES: AttackType[]` — ツールバーに表示する6種別の配列。
@@ -261,7 +278,7 @@
 
 **主要な型・関数**:
 - `LINGER_MS = 4000` — 攻撃が全て終了してからカードを消すまでの猶予時間(ms)。読み終える余裕を作るための定数。
-- `AttackExplanation()` (default export) — `useSimulationStore`から`activeAttacks`を読み取り専用で購読する。`activeAttacks`が空でなければ最後の要素(最新に開始された攻撃)の`type`を`latestType`として算出し、ローカル`state`の`displayedType`に反映する。`activeAttacks`が空になった場合は即座に消さず、`useEffect`+`setTimeout`で`LINGER_MS`後に`displayedType`を`null`にする(次の攻撃が来たら`clearTimeout`でタイマーを解除し表示を差し替える、クリーンアップ関数付き)。`AnimatePresence`+`motion.div`(`key={displayedType}`)でカードのマウント/アンマウント・種別切り替え時のアニメーションを行う。カードは`ATTACK_LABELS[displayedType]`(見出し)、`ATTACK_DESCRIPTIONS[displayedType].summary`(本文)、`ATTACK_DESCRIPTIONS[displayedType].whatYouSee`(画面で見えているもの)を表示する。
+- `AttackExplanation()` (default export) — `useSimulationStore`から`activeAttacks`を読み取り専用で購読する。`activeAttacks`が空でなければ最後の要素(最新に開始された攻撃)の`type`を`latestType`として算出し、ローカル`state`の`displayedType`に反映する。`activeAttacks`が空になった場合は即座に消さず、`useEffect`+`setTimeout`で`LINGER_MS`後に`displayedType`を`null`にする(次の攻撃が来たら`clearTimeout`でタイマーを解除し表示を差し替える、クリーンアップ関数付き)。`AnimatePresence`+`motion.div`(`key={displayedType}`)でカードのマウント/アンマウント・種別切り替え時のアニメーションを行う。カードは`ATTACK_LABELS[displayedType]`(見出し)、`ATTACK_DESCRIPTIONS[displayedType].summary`(本文)、`ATTACK_DESCRIPTIONS[displayedType].whatYouSee`(画面で見えているもの)を表示する。ルート`div`のz-indexは**Phase1(UI重なり解消)で`z-20`→`z-30`に変更**(NetworkMap内の下部オーバーレイ行`z-20`より前面、モーダル本体`z-50`より背面という階層に統一)。
 
 **依存しているファイル**: `framer-motion`(`AnimatePresence`, `motion`)、`../../store/simulationStore`(`useSimulationStore`、読み取り専用で`activeAttacks`)、`../../types`(`AttackType`)、`./constants`(`ATTACK_LABELS`, `ATTACK_DESCRIPTIONS`)
 
@@ -368,14 +385,14 @@
 
 ## `src/components/StatsPanel/StatsPanel.tsx`
 
-**役割**: 右下に浮かぶ統計HUDパネル本体。`useSimulationStore`から`stats`(読み取り専用)を取得し、CPU/Memory/Networkをバーゲージ(`GaugeBar`)、Attack Scoreをカウンター(`AttackScoreCounter`)として表示する。AppLayout側で`absolute bottom-4 right-4`配置される前提のため、本コンポーネント自身は位置指定を持たず、カードの見た目(サイズ・ガラスモーフィズム背景・枠線・shadow)のみを担う。
+**役割**: 統計HUDパネル本体。`useSimulationStore`から`stats`(読み取り専用)を取得し、CPU/Memory/Networkをバーゲージ(`GaugeBar`)、Attack Scoreをカウンター(`AttackScoreCounter`)として表示する。**Phase1(UI重なり解消)でNetworkMap内の下部オーバーレイ行(`AttackToolbar`と左右に並ぶ)に配置される前提に変更**(旧: AppLayout側で`absolute bottom-4 right-4`配置)。本コンポーネント自身は位置指定を持たず、カードの見た目(サイズ・ガラスモーフィズム背景・枠線・shadow)のみを担う点は変更なし。
 
 **主要な型・関数**:
 - `StatsPanel()` (default export) — ルートコンポーネント。`w-64`のガラスモーフィズムカード(`bg-slate-900/70 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-lg shadow-black/40`)。`motion.div`の`opacity`を`[0.96, 1, 0.96]`の範囲で4秒周期にゆるく往復させ、常時稼働している印象(breathe効果)を出す。ヘッダーに`animate-ping`を使ったライブ表示ドット+「System Stats」見出し。内部に`<GaugeBar label="CPU" value={stats.cpu} />`/`Memory`/`Network`の3本と、区切り線、`<AttackScoreCounter value={stats.attackScore} />`を縦に並べる。
 
 **依存しているファイル**: `../../store/simulationStore`(`useSimulationStore`、`stats`のみ読み取り)、`./GaugeBar`、`./AttackScoreCounter`、`framer-motion`(`motion`)
 
-**このファイルを参照しているファイル**: `src/components/Layout/AppLayout.tsx`(NetworkMap領域内に`absolute bottom-4 right-4`で重ねて配置)
+**このファイルを参照しているファイル**: `src/components/NetworkMap/NetworkMap.tsx`(下部オーバーレイ行内で`AttackToolbar`と左右に並べて配置)
 
 ---
 

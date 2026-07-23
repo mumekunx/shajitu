@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NODE_COLORS, NODE_DESCRIPTIONS } from '../NetworkMap/constants';
 import type { NodeType } from '../../types';
@@ -6,27 +6,30 @@ import type { NodeType } from '../../types';
 /** 「登場する機器」節での表示順(通信の流れが分かる順) */
 const NODE_TYPE_ORDER: NodeType[] = ['attacker', 'internet', 'router', 'firewall', 'dns', 'server', 'host'];
 
+interface WelcomeOverlayProps {
+  open: boolean;
+  onClose: () => void;
+}
+
 /**
- * 起動時に表示するウェルカム＆操作ガイドのモーダルオーバーレイ。
+ * 起動時に表示するウェルカム＆操作ガイドのモーダルオーバーレイ本体。
  * 初見者向けに「これは何か/画面の見方/やってみよう/注記」を説明する。
  * store/型/エンジンには一切依存しない、純粋なUIコンポーネント。
- * 閉じた後は画面隅の「?」ボタンからいつでも再表示できる。
+ * open state は AppLayout 側で保持し、起動ボタン(WelcomeOverlayLauncher)とこのモーダル本体の
+ * 両方に渡す(controlled化)。サイドバーと構造的に重ならない位置に起動ボタンを置くための分離。
  */
-export default function WelcomeOverlay() {
-  const [open, setOpen] = useState(true);
-
+export default function WelcomeOverlay({ open, onClose }: WelcomeOverlayProps) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open]);
+  }, [open, onClose]);
 
   return (
-    <>
-      <AnimatePresence>
+    <AnimatePresence>
         {open && (
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
@@ -34,7 +37,7 @@ export default function WelcomeOverlay() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={() => setOpen(false)}
+            onClick={onClose}
           >
             <motion.div
               role="dialog"
@@ -57,7 +60,7 @@ export default function WelcomeOverlay() {
                 <button
                   type="button"
                   aria-label="閉じる"
-                  onClick={() => setOpen(false)}
+                  onClick={onClose}
                   className="shrink-0 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700/70 hover:text-white"
                 >
                   ×
@@ -121,7 +124,7 @@ export default function WelcomeOverlay() {
 
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={onClose}
                 className="w-full rounded-xl bg-red-500/80 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition-colors hover:bg-red-500 md:w-auto"
               >
                 始める
@@ -129,19 +132,26 @@ export default function WelcomeOverlay() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+    </AnimatePresence>
+  );
+}
 
-      {!open && (
-        <button
-          type="button"
-          aria-label="操作ガイドを表示"
-          title="操作ガイドを表示"
-          onClick={() => setOpen(true)}
-          className="fixed right-4 top-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-sm font-semibold text-slate-300 shadow-lg shadow-black/40 backdrop-blur-md transition-colors hover:bg-slate-800/80 hover:text-cyan-400"
-        >
-          ?
-        </button>
-      )}
-    </>
+/**
+ * WelcomeOverlay 起動用の「?」ボタン。
+ * モーダル本体とは別コンポーネントとして切り出し、AppLayout のマップ領域ラッパ内(サイドバーとは
+ * 構造的に重ならないスコープ)に配置する。モーダル本体は引き続き AppLayout ルート直下の
+ * fixed inset-0 z-50 のまま(こちらの isolate スコープに入れると z-index が閉じ込められ壊れるため)。
+ */
+export function WelcomeOverlayLauncher({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="操作ガイドを表示"
+      title="操作ガイドを表示"
+      onClick={onOpen}
+      className="absolute right-4 top-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-sm font-semibold text-slate-300 shadow-lg shadow-black/40 backdrop-blur-md transition-colors hover:bg-slate-800/80 hover:text-cyan-400"
+    >
+      ?
+    </button>
   );
 }

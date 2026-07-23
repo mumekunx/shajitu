@@ -4,9 +4,10 @@ import GaugeBar from './GaugeBar';
 import AttackScoreCounter from './AttackScoreCounter';
 
 /**
- * 右下に浮かぶ統計HUDパネル。
+ * 統計HUDパネル。
  * CPU/Memory/Networkをバーゲージ、Attack Scoreをカウンターで表示する。
- * AppLayout側でabsolute配置されるため、本コンポーネント自身は配置指定を持たない。
+ * NetworkMap側の下部オーバーレイ行(AttackToolbarと左右に並ぶ)内に配置されるため、
+ * 本コンポーネント自身は配置指定を持たない。
  */
 export default function StatsPanel() {
   const stats = useSimulationStore((state) => state.stats);

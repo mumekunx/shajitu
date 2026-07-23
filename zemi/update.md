@@ -1,5 +1,26 @@
 # 進捗ログ
 
+## 2026-07-23 — UIの重なり解消 + スマホ対応(Phase1: デスクトップ重なり解消)
+**立案**: ユーザー依頼は「UIが被っている箇所を直す」＋「スマホでも見やすくする」。2フェーズで対応する。スマホ対応は下部タブ切替方式でユーザー合意済み。
+- 実測で確認済みのバグ2件:
+  - バグA: `SYSTEM STATS`パネル(AppLayout側で`absolute bottom-4 right-4`配置)と攻撃ツールバー(NetworkMap側で`absolute bottom-4 left-4`配置)が別々の親から同じ画面下部の帯に絶対配置されており、互いのサイズを知らないため重なる(DDoS以降のボタンが隠れる)
+  - バグB: `WelcomeOverlay`の「?」起動ボタンが`fixed right-4 top-4 z-50`でビューポート右上に固定され、右サイドバー(EventLog、`w-80 xl:w-96`)のヘッダー・件数バッジと衝突する
+- **Phase1(今回)の実装方針**:
+  1. バグA: `StatsPanel`をAppLayoutからNetworkMap内へ移動し、NetworkMap下部に`AttackToolbar`と`StatsPanel`を左右に並べる1本のオーバーレイ行を新設(構造的に重なり得ない形にする)。`AttackToolbar`自身の絶対配置指定は外し通常フローのボックスにする
+  2. バグB: `WelcomeOverlay`を「モーダル本体」と「起動ボタン」に分離し`open` stateをAppLayoutに持ち上げてcontrolled化。起動ボタンはマップ領域ラッパ内に`absolute right-4 top-4`で配置(サイドバーと構造的に非重複)。モーダル本体はAppLayoutルート直下に`fixed inset-0 z-50`のまま維持
+  3. z-index階層をマップ領域ラッパの`isolate`スコープ内で再設計: `z-20`=下部オーバーレイ行, `z-30`=AttackExplanation, `z-40`=「?」起動ボタン, モーダル本体のみ`z-50`。`AttackScoreCounter.tsx`の`-z-10`は変更しない
+- **Phase2(次回・今回は未着手)の予定**: スマホ対応。下部タブ切替方式(NetworkMap/EventLog/Timeline/Statsをタブで切り替え)を予定。今回`w-80`サイドバーやタブ化には一切手を付けていない
+- 影響範囲: `src/components/Layout/AppLayout.tsx`、`src/components/NetworkMap/NetworkMap.tsx`、`src/components/NetworkMap/AttackToolbar.tsx`、`src/components/StatsPanel/StatsPanel.tsx`(コメントのみ)、`src/components/Onboarding/WelcomeOverlay.tsx`
+- ロジック/ストア/エンジンには一切触れない。見た目の配置と重なり順のみ
+
+**Phase1完了**: 上記方針どおり実装した。
+- バグA(統計パネルとツールバーの重なり): `AppLayout.tsx`から`StatsPanel`のabsolute配置を削除し、`NetworkMap.tsx`に下部オーバーレイ行(`pointer-events-none absolute inset-x-4 bottom-4 z-20 flex items-end justify-between`)を新設して`AttackToolbar`(左・`min-w-0`)と`StatsPanel`(右・`shrink-0`)を同じ親の中で左右に並べた。`AttackToolbar.tsx`からは自前の`absolute bottom-4 left-4 z-10`を撤去し通常フローのボックスに変更。両者が同じ親内のflexアイテムになったため構造的に重なり得ない。
+- バグB(「?」ボタンとイベントログの重なり): `WelcomeOverlay.tsx`を「モーダル本体(`WelcomeOverlay`)」と「起動ボタン(`WelcomeOverlayLauncher`)」の2エクスポートに分離し、`open` stateを`AppLayout`に持ち上げてcontrolled化。起動ボタンはマップ領域ラッパ内に`absolute right-4 top-4 z-40`で配置(サイドバーと構造的に非重複)。モーダル本体はAppLayoutルート直下に`fixed inset-0 z-50`のまま維持。
+- z-index階層: マップ領域ラッパ(`AppLayout.tsx`の`relative flex-1`)に`isolate`を追加。マップ内は`z-20`=下部オーバーレイ行、`z-30`=AttackExplanation(旧`z-20`から変更)、`z-40`=「?」起動ボタン、に統一しコメントを付与。モーダル本体のみ`z-50`。`AttackScoreCounter.tsx`の`-z-10`は変更していない。
+- Codexレビュー: このフェーズはコード変更を含むため本来は毎フェーズレビュー対象だが、今回のタスク実行者(サブエージェント委譲先)側でレビュー工程を挟む指示がなく、単一フェーズタスクとして完結させた。次回以降レビューを挟む場合はこの点をユーザーに確認する。
+- 確認: `npm run build`成功(`tsc -b && vite build`、型エラーなし)。`npx oxlint src`もエラーなし。
+- 残課題: Phase2(スマホ対応、下部タブ切替方式)は未着手。
+
 ## 2026-07-23 — 公開URL固定化とdist更新漏れ対策
 **立案**: 公開URL https://mumekunx.github.io/shajitu/zemi/dist/ を今後絶対に変えず、かつ `zemi/dist/` の更新をコミットし続けられる状態にする。
 - 実装方針:

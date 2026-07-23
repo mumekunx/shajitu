@@ -47,7 +47,8 @@ export default function AttackExplanation() {
   const description = displayedType ? ATTACK_DESCRIPTIONS[displayedType] : null;
 
   return (
-    <div className="pointer-events-none absolute top-4 left-1/2 z-20 w-[min(90%,28rem)] max-w-md -translate-x-1/2">
+    // z-30: 下部オーバーレイ行(z-20)より前面、モーダル本体(z-50)より背面に位置づける
+    <div className="pointer-events-none absolute top-4 left-1/2 z-30 w-[min(90%,28rem)] max-w-md -translate-x-1/2">
       <AnimatePresence>
         {displayedType && description && (
           <motion.div

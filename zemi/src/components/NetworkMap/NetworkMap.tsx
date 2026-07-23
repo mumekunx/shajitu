@@ -7,6 +7,7 @@ import AttackEffectsLayer from './AttackEffectsLayer';
 import BotnetLayer from './BotnetLayer';
 import AttackToolbar from './AttackToolbar';
 import AttackExplanation from './AttackExplanation';
+import StatsPanel from '../StatsPanel/StatsPanel';
 import { TRAFFIC_COLORS } from './constants';
 import './networkMap.css';
 
@@ -113,7 +114,18 @@ export default function NetworkMap() {
 
       <AttackExplanation />
 
-      <AttackToolbar nodes={nodes} />
+      {/* 下部オーバーレイ行: 攻撃ツールバーと統計パネルを同じ親(この行)の中で左右に並べる。
+          両者が別々の親から絶対配置されていた旧構成では互いのサイズを知らず重なっていたため、
+          構造的に重なり得ない形にした。行自体は pointer-events-none にしてマップ操作を奪わず、
+          中の2つだけ pointer-events-auto で操作可能にする。 */}
+      <div className="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex items-end justify-between gap-4">
+        <div className="pointer-events-auto min-w-0">
+          <AttackToolbar nodes={nodes} />
+        </div>
+        <div className="pointer-events-auto shrink-0">
+          <StatsPanel />
+        </div>
+      </div>
     </div>
   );
 }

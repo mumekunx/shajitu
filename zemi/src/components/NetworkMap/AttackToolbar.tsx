@@ -50,7 +50,7 @@ export default function AttackToolbar({ nodes }: AttackToolbarProps) {
   };
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2 rounded-lg bg-slate-900/60 p-2 backdrop-blur-sm border border-slate-700/50">
+    <div className="max-w-full flex flex-wrap gap-2 rounded-lg bg-slate-900/60 p-2 backdrop-blur-sm border border-slate-700/50">
       <div className="flex w-full flex-wrap items-center gap-2 pb-1">
         <span className="text-xs font-medium text-slate-400">SSH認証:</span>
         <button
