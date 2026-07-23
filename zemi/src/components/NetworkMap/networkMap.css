@@ -1,0 +1,29 @@
+/* NetworkMap 専用の背景グリッドアニメーション。
+   ダーク背景上に薄く発光する格子線をゆっくり動かす。 */
+.network-grid-bg {
+  background-color: #0f172a;
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: network-grid-drift 12s linear infinite, network-grid-pulse 4s ease-in-out infinite;
+}
+
+@keyframes network-grid-drift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+@keyframes network-grid-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
